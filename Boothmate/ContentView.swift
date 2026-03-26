@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var speechManager = SpeechManager()
+
     @State private var horizontalSplit: CGFloat = 0.5
     @State private var verticalSplit: CGFloat = 0.5
     @State private var showSettings = false
 
-    @State private var dragStartH: CGFloat = 0.5
-    @State private var dragStartV: CGFloat = 0.5
 
     var body: some View {
         GeometryReader { geo in
@@ -14,14 +14,12 @@ struct ContentView: View {
             let leftWidth = (geo.size.width - handleWidth) * horizontalSplit
             let rightWidth = geo.size.width - leftWidth - handleWidth
             let topHeight = (geo.size.height - handleWidth) * verticalSplit
-            
+
             HStack(spacing: 0) {
-                // 왼쪽: 실시간 자막
-                SubtitleView()
+                SubtitleView(speechManager: speechManager)
                     .frame(width: leftWidth)
                     .clipped()
 
-                // 좌우 드래그 핸들
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))
                     .frame(width: handleWidth)
@@ -39,13 +37,11 @@ struct ContentView: View {
                             }
                     )
 
-                // 오른쪽: 파일뷰어 + 사전
                 VStack(spacing: 0) {
                     FileViewerView()
                         .frame(width: rightWidth, height: topHeight)
                         .clipped()
 
-                    // 상하 드래그 핸들
                     Rectangle()
                         .fill(Color.gray.opacity(0.3))
                         .frame(height: handleWidth)
