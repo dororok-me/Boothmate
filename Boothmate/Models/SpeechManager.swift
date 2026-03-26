@@ -10,6 +10,7 @@ class SpeechManager: ObservableObject {
     @Published var currentText: String = ""
     @Published var isRecording: Bool = false
     @Published var selectedLanguage: String = "en-US"
+    @Published var fontSize: CGFloat = 20.0
 
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
