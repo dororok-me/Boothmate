@@ -6,15 +6,61 @@ struct SubtitleView: View {
     @State private var showMenu = false
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            // 자막 표시 영역 (전체 화면)
+        VStack(spacing: 0) {
+            // 상단 컨트롤 바
+            HStack {
+                // 메뉴 버튼
+                Button {
+                    showMenu.toggle()
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+
+                Spacer()
+
+                // 언어 토글
+                Picker("언어", selection: $speechManager.selectedLanguage) {
+                    ForEach(speechManager.languages, id: \.1) { name, code in
+                        Text(name).tag(code)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+
+                Spacer()
+
+                // 자막 지우기
+                Button {
+                    speechManager.clearSubtitles()
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundColor(.gray)
+                }
+
+                // 녹음 시작/중지
+                Button {
+                    if speechManager.isRecording {
+                        speechManager.stopRecording()
+                    } else {
+                        speechManager.startRecording()
+                    }
+                } label: {
+                    Image(systemName: speechManager.isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(speechManager.isRecording ? .red : .green)
+                }
+            }
+            .padding(.leading, 60)
+            .padding(.trailing, 12)
+            .padding(.vertical, 8)
+            .background(Color.black)
+
+            // 자막 표시 영역
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        // 상단 여백 (메뉴 버튼 가리지 않게)
-                        Spacer()
-                            .frame(height: 50)
-
+                    LazyVStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(speechManager.subtitles.enumerated()), id: \.offset) { index, text in
                             Text(text)
                                 .foregroundColor(.white)
@@ -31,7 +77,9 @@ struct SubtitleView: View {
                                 .id("current")
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.leading, 60)
+                    .padding(.trailing, 16)
+                    .padding(.top, 8)
                 }
                 .onChange(of: speechManager.currentText) {
                     withAnimation {
@@ -46,34 +94,11 @@ struct SubtitleView: View {
                     }
                 }
             }
-
-            // 좌측 상단 메뉴 버튼
-            HStack {
-                Button {
-                    showMenu.toggle()
-                } label: {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .padding(10)
-                        .background(Color.black.opacity(0.5))
-                        .clipShape(Circle())
-                }
-
-                Spacer()
-
-                // 녹음 상태 표시 (녹음 중일 때만)
-                if speechManager.isRecording {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 10, height: 10)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
         }
-        .background(Color.black)
-        .onAppear {
+        .padding(.top, 1)
+                .background(Color.black)
+                .safeAreaPadding(.top)
+                .onAppear {
             speechManager.requestPermissions()
         }
         .sheet(isPresented: $showMenu) {
@@ -82,7 +107,6 @@ struct SubtitleView: View {
     }
 }
 
-// 메뉴 화면
 struct SubtitleMenuView: View {
     @ObservedObject var speechManager: SpeechManager
     @Environment(\.dismiss) var dismiss
@@ -90,58 +114,15 @@ struct SubtitleMenuView: View {
     var body: some View {
         NavigationStack {
             List {
-                // 녹음 시작/중지
-                Section {
-                    Button {
-                        if speechManager.isRecording {
-                            speechManager.stopRecording()
-                        } else {
-                            speechManager.startRecording()
-                        }
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Image(systemName: speechManager.isRecording ? "stop.circle.fill" : "mic.circle.fill")
-                                .foregroundColor(speechManager.isRecording ? .red : .green)
-                                .font(.title2)
-                            Text(speechManager.isRecording ? "녹음 중지" : "녹음 시작")
-                        }
-                    }
+                Section("음성인식 엔진") {
+                    Text("Apple (기본)")
                 }
-
-                // 언어 선택
-                Section("언어") {
-                    ForEach(speechManager.languages, id: \.1) { name, code in
-                        Button {
-                            speechManager.selectedLanguage = code
-                        } label: {
-                            HStack {
-                                Text(name)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if speechManager.selectedLanguage == code {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 자막 지우기
-                Section {
-                    Button(role: .destructive) {
-                        speechManager.clearSubtitles()
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Image(systemName: "trash")
-                            Text("자막 지우기")
-                        }
-                    }
+                Section("설정") {
+                    Text("글로서리")
+                    Text("폰트 크기")
                 }
             }
-            .navigationTitle("자막 설정")
+            .navigationTitle("설정")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
