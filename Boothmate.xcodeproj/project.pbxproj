@@ -32,8 +32,8 @@
 		0EB846C62F756DA700F12CAB = {
 			isa = PBXGroup;
 			children = (
-				0EB846D12F756DA700F12CAB /* Boothmate */,
 				0EB846D02F756DA700F12CAB /* Products */,
+				0EB846D12F756DA700F12CAB /* Boothmate */,
 			);
 			sourceTree = "<group>";
 		};
