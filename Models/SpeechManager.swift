@@ -96,10 +96,11 @@ class SpeechManager: ObservableObject {
 
                     if let result = result {
                         let rawText = result.bestTranscription.formattedString
-                        self.currentText = self.applyGlossary(to: rawText)
+                        self.currentText = rawText
 
                         if result.isFinal {
-                            if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            let trimmed = self.currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !trimmed.isEmpty {
                                 self.subtitles.append(self.currentText)
                             }
                             self.currentText = ""
@@ -154,29 +155,6 @@ class SpeechManager: ObservableObject {
     func clearSubtitles() {
         subtitles.removeAll()
         currentText = ""
-    }
-
-    private func applyGlossary(to text: String) -> String {
-        guard let glossaryStore = glossaryStore else { return text }
-
-        var output = text
-
-        for entry in glossaryStore.entries {
-            let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
-            let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard !source.isEmpty else { continue }
-
-            if output.localizedCaseInsensitiveContains(source) {
-                output = output.replacingOccurrences(
-                    of: source,
-                    with: target,
-                    options: .caseInsensitive
-                )
-            }
-        }
-
-        return output
     }
 }
 
