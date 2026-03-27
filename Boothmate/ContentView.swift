@@ -12,31 +12,43 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showGlossary = false
 
-    private let dividerThickness: CGFloat = 18
+    @State private var horizontalSplitDragStart: CGFloat?
+    @State private var leftVerticalSplitDragStart: CGFloat?
+    @State private var rightVerticalSplitDragStart: CGFloat?
+
+    private let dividerHitThickness: CGFloat = 28
     private let visibleDividerThickness: CGFloat = 1
+
     private let minPaneWidth: CGFloat = 90
-    private let minPaneHeight: CGFloat = 35
+    private let minPaneHeight: CGFloat = 28
     private let topBarHeight: CGFloat = 50
 
     var body: some View {
         GeometryReader { geo in
-            let rootFrame = geo.frame(in: .global)
             let totalWidth = geo.size.width
             let totalHeight = geo.size.height
 
             let safeTop = geo.safeAreaInsets.top
+            let safeLeading = geo.safeAreaInsets.leading
+
+            let isLandscape = totalWidth > totalHeight
+
+            // 다이나믹 아일랜드/노치 회피용 내부 여백
+            let leftDangerInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
+
             let topSafeSpacing = safeTop + 8
 
+            // 좌우 분할 계산은 전체 폭 기준으로 유지
             let leftWidth = clamp(
-                value: (totalWidth - dividerThickness) * horizontalSplit,
+                value: (totalWidth - dividerHitThickness) * horizontalSplit,
                 minValue: minPaneWidth,
-                maxValue: totalWidth - dividerThickness - minPaneWidth
+                maxValue: totalWidth - dividerHitThickness - minPaneWidth
             )
 
-            let rightWidth = totalWidth - leftWidth - dividerThickness
+            let rightWidth = totalWidth - leftWidth - dividerHitThickness
 
-            let leftContentHeight = totalHeight - topSafeSpacing - topBarHeight - dividerThickness
-            let rightContentHeight = totalHeight - dividerThickness
+            let leftContentHeight = totalHeight - topSafeSpacing - topBarHeight - dividerHitThickness
+            let rightContentHeight = totalHeight - dividerHitThickness
 
             let leftTopHeight = clamp(
                 value: leftContentHeight * leftVerticalSplit,
@@ -56,26 +68,39 @@ struct ContentView: View {
 
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
-                    topBar
+                    topBar(leftDangerInset: leftDangerInset)
                         .frame(height: topBarHeight)
                         .padding(.top, topSafeSpacing)
 
-                    subtitleArea
+                    subtitleArea(leftDangerInset: leftDangerInset)
                         .frame(width: leftWidth, height: leftTopHeight)
                         .background(speechManager.selectedTheme.backgroundColor)
 
                     horizontalDragHandle
-                        .frame(width: leftWidth, height: dividerThickness)
+                        .frame(width: leftWidth, height: dividerHitThickness)
+                        .contentShape(Rectangle())
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 0, coordinateSpace: .global)
                                 .onChanged { value in
-                                    let y = value.location.y - rootFrame.minY - topSafeSpacing - topBarHeight
-                                    let split = y / leftContentHeight
-                                    leftVerticalSplit = clamp(
-                                        value: split,
-                                        minValue: minPaneHeight / leftContentHeight,
-                                        maxValue: 1 - (minPaneHeight / leftContentHeight)
-                                    )
+                                    if leftVerticalSplitDragStart == nil {
+                                        leftVerticalSplitDragStart = leftVerticalSplit
+                                    }
+
+                                    guard let start = leftVerticalSplitDragStart else { return }
+
+                                    let delta = value.translation.height / leftContentHeight
+                                    let newSplit = start + delta
+
+                                    withTransaction(Transaction(animation: nil)) {
+                                        leftVerticalSplit = clamp(
+                                            value: newSplit,
+                                            minValue: minPaneHeight / leftContentHeight,
+                                            maxValue: 1 - (minPaneHeight / leftContentHeight)
+                                        )
+                                    }
+                                }
+                                .onEnded { _ in
+                                    leftVerticalSplitDragStart = nil
                                 }
                         )
 
@@ -85,17 +110,30 @@ struct ContentView: View {
                 }
 
                 verticalDragHandle
-                    .frame(width: dividerThickness, height: totalHeight)
+                    .frame(width: dividerHitThickness, height: totalHeight)
+                    .contentShape(Rectangle())
                     .highPriorityGesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .global)
                             .onChanged { value in
-                                let x = value.location.x - rootFrame.minX
-                                let split = x / (totalWidth - dividerThickness)
-                                horizontalSplit = clamp(
-                                    value: split,
-                                    minValue: minPaneWidth / (totalWidth - dividerThickness),
-                                    maxValue: 1 - (minPaneWidth / (totalWidth - dividerThickness))
-                                )
+                                if horizontalSplitDragStart == nil {
+                                    horizontalSplitDragStart = horizontalSplit
+                                }
+
+                                guard let start = horizontalSplitDragStart else { return }
+
+                                let delta = value.translation.width / (totalWidth - dividerHitThickness)
+                                let newSplit = start + delta
+
+                                withTransaction(Transaction(animation: nil)) {
+                                    horizontalSplit = clamp(
+                                        value: newSplit,
+                                        minValue: minPaneWidth / (totalWidth - dividerHitThickness),
+                                        maxValue: 1 - (minPaneWidth / (totalWidth - dividerHitThickness))
+                                    )
+                                }
+                            }
+                            .onEnded { _ in
+                                horizontalSplitDragStart = nil
                             }
                     )
 
@@ -105,17 +143,30 @@ struct ContentView: View {
                         .background(Color(.systemBackground))
 
                     horizontalDragHandle
-                        .frame(width: rightWidth, height: dividerThickness)
+                        .frame(width: rightWidth, height: dividerHitThickness)
+                        .contentShape(Rectangle())
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 0, coordinateSpace: .global)
                                 .onChanged { value in
-                                    let y = value.location.y - rootFrame.minY
-                                    let split = y / rightContentHeight
-                                    rightVerticalSplit = clamp(
-                                        value: split,
-                                        minValue: minPaneHeight / rightContentHeight,
-                                        maxValue: 1 - (minPaneHeight / rightContentHeight)
-                                    )
+                                    if rightVerticalSplitDragStart == nil {
+                                        rightVerticalSplitDragStart = rightVerticalSplit
+                                    }
+
+                                    guard let start = rightVerticalSplitDragStart else { return }
+
+                                    let delta = value.translation.height / rightContentHeight
+                                    let newSplit = start + delta
+
+                                    withTransaction(Transaction(animation: nil)) {
+                                        rightVerticalSplit = clamp(
+                                            value: newSplit,
+                                            minValue: minPaneHeight / rightContentHeight,
+                                            maxValue: 1 - (minPaneHeight / rightContentHeight)
+                                        )
+                                    }
+                                }
+                                .onEnded { _ in
+                                    rightVerticalSplitDragStart = nil
                                 }
                         )
 
@@ -139,7 +190,7 @@ struct ContentView: View {
         }
     }
 
-    private var topBar: some View {
+    private func topBar(leftDangerInset: CGFloat) -> some View {
         HStack(spacing: 8) {
             Spacer()
 
@@ -169,7 +220,8 @@ struct ContentView: View {
 
             recordButton
         }
-        .padding(.horizontal, 10)
+        .padding(.leading, 10 + leftDangerInset)
+        .padding(.trailing, 10)
         .background(Color.clear)
     }
 
@@ -254,18 +306,26 @@ struct ContentView: View {
         .buttonStyle(.plain)
     }
 
-    private var subtitleArea: some View {
+    private func subtitleArea(leftDangerInset: CGFloat) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     ForEach(speechManager.subtitles.indices, id: \.self) { index in
-                        subtitleBlock(text: speechManager.subtitles[index], opacity: 1.0)
-                            .id(index)
+                        subtitleBlock(
+                            text: speechManager.subtitles[index],
+                            opacity: 1.0,
+                            leftDangerInset: leftDangerInset
+                        )
+                        .id(index)
                     }
 
                     if !speechManager.currentText.isEmpty {
-                        subtitleBlock(text: speechManager.currentText, opacity: 0.65)
-                            .id("current")
+                        subtitleBlock(
+                            text: speechManager.currentText,
+                            opacity: 0.65,
+                            leftDangerInset: leftDangerInset
+                        )
+                        .id("current")
                     }
 
                     Color.clear
@@ -275,16 +335,10 @@ struct ContentView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 16)
             }
-            .onChange(of: speechManager.currentText) { _ in
-                proxy.scrollTo("bottom", anchor: .bottom)
-            }
-            .onChange(of: speechManager.subtitles.count) { _ in
-                proxy.scrollTo("bottom", anchor: .bottom)
-            }
         }
     }
 
-    private func subtitleBlock(text: String, opacity: Double) -> some View {
+    private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
         SubtitleTextView(
             text: text,
             fontSize: speechManager.fontSize,
@@ -298,15 +352,19 @@ struct ContentView: View {
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
+        .padding(.leading, 20 + leftDangerInset)
+        .padding(.trailing, 20)
     }
 
     private var verticalDragHandle: some View {
         ZStack {
-            Rectangle().fill(Color.clear)
             Rectangle()
-                .fill(Color.gray.opacity(0.20))
+                .fill(Color.clear)
+
+            Rectangle()
+                .fill(Color.gray.opacity(0.14))
                 .frame(width: visibleDividerThickness)
+
             Capsule()
                 .fill(Color.gray.opacity(0.55))
                 .frame(width: 4, height: 34)
@@ -316,10 +374,13 @@ struct ContentView: View {
 
     private var horizontalDragHandle: some View {
         ZStack {
-            Rectangle().fill(Color.clear)
             Rectangle()
-                .fill(Color.gray.opacity(0.20))
+                .fill(Color.clear)
+
+            Rectangle()
+                .fill(Color.gray.opacity(0.14))
                 .frame(height: visibleDividerThickness)
+
             Capsule()
                 .fill(Color.gray.opacity(0.55))
                 .frame(width: 34, height: 4)
