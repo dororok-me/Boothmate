@@ -16,6 +16,21 @@
 			path = Boothmate;
 			sourceTree = "<group>";
 		};
+		0EF174C52F76B8C200E33D9A /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		0EF174CA2F76B8D200E33D9A /* Utils */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		0EF174D42F76B8E100E33D9A /* Views */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Views;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,8 +47,11 @@
 		0EB846C62F756DA700F12CAB = {
 			isa = PBXGroup;
 			children = (
-				0EB846D02F756DA700F12CAB /* Products */,
+				0EF174C52F76B8C200E33D9A /* Models */,
+				0EF174D42F76B8E100E33D9A /* Views */,
+				0EF174CA2F76B8D200E33D9A /* Utils */,
 				0EB846D12F756DA700F12CAB /* Boothmate */,
+				0EB846D02F756DA700F12CAB /* Products */,
 			);
 			sourceTree = "<group>";
 		};
@@ -62,6 +80,9 @@
 			);
 			fileSystemSynchronizedGroups = (
 				0EB846D12F756DA700F12CAB /* Boothmate */,
+				0EF174C52F76B8C200E33D9A /* Models */,
+				0EF174CA2F76B8D200E33D9A /* Utils */,
+				0EF174D42F76B8E100E33D9A /* Views */,
 			);
 			name = Boothmate;
 			packageProductDependencies = (

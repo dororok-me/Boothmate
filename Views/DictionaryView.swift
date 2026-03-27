@@ -3,13 +3,13 @@ import WebKit
 import Combine
 
 struct DictionaryView: View {
-    @State private var currentURL = URL(string: "https://small.dic.daum.net")!
+    @State private var currentURL = URL(string: "https://dic.daum.net/index.do?dic=eng")!
     @State private var currentWord: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(currentWord.isEmpty ? "Dictionary" : "Search: \(currentWord)")
+                Text(currentWord.isEmpty ? "Dictionary" : currentWord)
                     .font(.headline)
                     .lineLimit(1)
 
@@ -17,7 +17,7 @@ struct DictionaryView: View {
 
                 Button {
                     currentWord = ""
-                    currentURL = URL(string: "https://small.dic.daum.net")!
+                    currentURL = URL(string: "https://dic.daum.net/index.do?dic=eng")!
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.title3)
@@ -31,8 +31,9 @@ struct DictionaryView: View {
 
             DaumDictionaryWebView(url: currentURL)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .searchDictionary)) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.searchDictionary)) { notification in
             guard let word = notification.object as? String else { return }
+
             let trimmed = word.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }
 
@@ -43,14 +44,7 @@ struct DictionaryView: View {
 
     private func makeSearchURL(for text: String) -> URL {
         let encoded = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? text
-
-        let isKorean = text.unicodeScalars.contains { scalar in
-            (0xAC00...0xD7A3).contains(scalar.value)
-        }
-
-        let dicType = isKorean ? "ee" : "eq"
-
-        return URL(string: "https://small.dic.daum.net/search.do?q=\(encoded)&dic=\(dicType)")!
+        return URL(string: "https://dic.daum.net/search.do?q=\(encoded)&dic=eng")!
     }
 }
 
@@ -67,7 +61,7 @@ struct DaumDictionaryWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        if webView.url != url {
+        if webView.url?.absoluteString != url.absoluteString {
             webView.load(URLRequest(url: url))
         }
     }

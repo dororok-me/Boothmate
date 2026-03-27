@@ -37,7 +37,7 @@ class SpeechManager: ObservableObject {
         SFSpeechRecognizer.requestAuthorization { status in
             Task { @MainActor in
                 if status != .authorized {
-                    print("음성인식 권한 거부")
+                    print("음성 인식 권한이 허용되지 않았습니다.")
                 }
             }
         }
@@ -45,7 +45,7 @@ class SpeechManager: ObservableObject {
         AVAudioApplication.requestRecordPermission { granted in
             Task { @MainActor in
                 if !granted {
-                    print("마이크 권한 거부")
+                    print("마이크 권한이 허용되지 않았습니다.")
                 }
             }
         }
@@ -55,11 +55,18 @@ class SpeechManager: ObservableObject {
         stopRecording()
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
-        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else { return }
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            print("현재 선택된 언어의 음성 인식을 사용할 수 없습니다.")
+            return
+        }
 
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.record, mode: .measurement, options: [.duckOthers, .allowBluetooth])
+            try audioSession.setCategory(
+                .record,
+                mode: .measurement,
+                options: [.duckOthers, .allowBluetooth]
+            )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
 
             if let preferredInput = audioSession.availableInputs?.first(where: { $0.portType == .usbAudio }) {
@@ -68,13 +75,14 @@ class SpeechManager: ObservableObject {
 
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             guard let recognitionRequest = recognitionRequest else { return }
+
             recognitionRequest.shouldReportPartialResults = true
 
             let inputNode = audioEngine.inputNode
-            let recordingFormat = inputNode.outputFormat(forBus: 0)
+            let format = inputNode.outputFormat(forBus: 0)
 
             inputNode.removeTap(onBus: 0)
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
 
@@ -88,23 +96,26 @@ class SpeechManager: ObservableObject {
 
                     if let result = result {
                         let rawText = result.bestTranscription.formattedString
-                        self.currentText = self.applyGlossaryFromStore(to: rawText)
+                        self.currentText = self.applyGlossary(to: rawText)
 
                         if result.isFinal {
-                            if !self.currentText.isEmpty {
+                            if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 self.subtitles.append(self.currentText)
                             }
                             self.currentText = ""
                         }
                     }
 
-                    if error != nil && self.isRecording {
-                        self.restartRecording()
+                    if let error = error {
+                        print("음성 인식 오류: \(error.localizedDescription)")
+                        if self.isRecording {
+                            self.restartRecording()
+                        }
                     }
                 }
             }
         } catch {
-            print("에러: \(error.localizedDescription)")
+            print("녹음 시작 오류: \(error.localizedDescription)")
         }
     }
 
@@ -117,10 +128,11 @@ class SpeechManager: ObservableObject {
         recognitionTask = nil
         isRecording = false
 
-        if !currentText.isEmpty {
+        let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
             subtitles.append(currentText)
-            currentText = ""
         }
+        currentText = ""
     }
 
     private func restartRecording() {
@@ -144,32 +156,36 @@ class SpeechManager: ObservableObject {
         currentText = ""
     }
 
-    private func applyGlossaryFromStore(to text: String) -> String {
-        guard let store = glossaryStore else { return text }
+    private func applyGlossary(to text: String) -> String {
+        guard let glossaryStore = glossaryStore else { return text }
 
-        var result = text
+        var output = text
 
-        for entry in store.entries {
-            if result.localizedCaseInsensitiveContains(entry.source) {
-                result = result.replacingOccurrences(
-                    of: entry.source,
-                    with: entry.target,
+        for entry in glossaryStore.entries {
+            let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
+            let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !source.isEmpty else { continue }
+
+            if output.localizedCaseInsensitiveContains(source) {
+                output = output.replacingOccurrences(
+                    of: source,
+                    with: target,
                     options: .caseInsensitive
                 )
             }
         }
 
-        return result
+        return output
     }
 }
 
-// MARK: - 테마 설정
 enum SubtitleTheme: String, CaseIterable, Identifiable {
     case normal = "Normal View"
     case night = "Night View"
     case legal = "Legal Pad"
 
-    var id: String { self.rawValue }
+    var id: String { rawValue }
 
     var backgroundColor: Color {
         switch self {

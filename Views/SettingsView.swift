@@ -26,8 +26,8 @@ struct SettingsView: View {
     private var languageSection: some View {
         Section("Language") {
             Picker("Recognition Language", selection: $speechManager.selectedLanguage) {
-                ForEach(speechManager.languages, id: \.1) { language in
-                    Text(language.0).tag(language.1)
+                ForEach(speechManager.languages, id: \.1) { item in
+                    Text(item.0).tag(item.1)
                 }
             }
             .pickerStyle(.inline)

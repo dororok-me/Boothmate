@@ -5,46 +5,95 @@ import UniformTypeIdentifiers
 struct FileViewerView: View {
     @State private var showFilePicker = false
     @State private var selectedFileURL: URL?
+    @State private var importErrorMessage: String?
 
     var body: some View {
         ZStack {
             if let url = selectedFileURL {
                 QuickLookPreview(url: url)
             } else {
-                Color(UIColor.systemBackground)
+                Color(.systemBackground)
+
+                Text("No file selected")
+                    .foregroundColor(.secondary)
+            }
+
+            if let message = importErrorMessage {
+                VStack {
+                    Spacer()
+
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .padding(.bottom, 12)
+                }
             }
 
             VStack {
                 HStack {
-                    Spacer()
                     Button {
                         showFilePicker = true
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
                             .foregroundColor(.blue)
-                            .background(Color.white.clipShape(Circle()))
                     }
-                    .padding(8)
+                    .padding(10)
+
+                    Spacer()
                 }
+
                 Spacer()
             }
         }
         .fileImporter(
             isPresented: $showFilePicker,
-            allowedContentTypes: [.pdf, .presentation, .image, .plainText, .rtf, .data]
+            allowedContentTypes: supportedTypes,
+            allowsMultipleSelection: false
         ) { result in
             switch result {
-            case .success(let url):
-                let didAccess = url.startAccessingSecurityScopedResource()
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                importErrorMessage = nil
                 selectedFileURL = url
-                if didAccess {
-                    defer { url.stopAccessingSecurityScopedResource() }
-                }
-            case .failure:
-                break
+
+            case .failure(let error):
+                importErrorMessage = error.localizedDescription
             }
         }
+    }
+
+    private var supportedTypes: [UTType] {
+        var types: [UTType] = [
+            .pdf,
+            .image,
+            .png,
+            .jpeg,
+            .heic,
+            .tiff,
+            .plainText,
+            .rtf,
+            .text,
+            .commaSeparatedText,
+            .json,
+            .xml,
+            .spreadsheet,
+            .presentation,
+            .data,
+            .content
+        ]
+
+        ["docx", "xlsx", "pptx", "pages", "numbers", "key"].forEach { ext in
+            if let type = UTType(filenameExtension: ext) {
+                types.append(type)
+            }
+        }
+
+        return types
     }
 }
 
@@ -66,7 +115,7 @@ struct QuickLookPreview: UIViewControllerRepresentable {
         controller.reloadData()
     }
 
-    class Coordinator: NSObject, QLPreviewControllerDataSource {
+    final class Coordinator: NSObject, QLPreviewControllerDataSource {
         var url: URL
 
         init(url: URL) {
