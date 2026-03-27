@@ -329,11 +329,28 @@ struct ContentView: View {
                     }
 
                     Color.clear
-                        .frame(height: 8)
-                        .id("bottom")
+                        .frame(height: 1)
+                        .id("bottomAnchor")
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 16)
+            }
+            .onAppear {
+                scrollToBottom(proxy)
+            }
+            .onChange(of: speechManager.currentText) { _ in
+                scrollToBottom(proxy)
+            }
+            .onChange(of: speechManager.subtitles.count) { _ in
+                scrollToBottom(proxy)
+            }
+        }
+    }
+    
+    private func scrollToBottom(_ proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.15)) {
+                proxy.scrollTo("bottomAnchor", anchor: .bottom)
             }
         }
     }
