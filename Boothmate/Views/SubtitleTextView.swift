@@ -79,7 +79,9 @@ struct WrappingHStack: View {
             .background(isGlossary ? Color.orange.opacity(0.15) : Color.clear)
             .cornerRadius(3)
             .onTapGesture {
-                onTapWord(word)
+            let cleaned = word.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: .punctuationCharacters)
+            onTapWord(cleaned)
             }
     }
 }

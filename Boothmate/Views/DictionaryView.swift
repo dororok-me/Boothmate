@@ -1,35 +1,45 @@
 import SwiftUI
+import WebKit
 
 struct DictionaryView: View {
     @State private var searchText = ""
+    @State private var currentURL: URL?
+    @State private var webViewID = UUID()
+
+    private let baseURL = "https://small.dic.daum.net"
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("다음 사전")
-                    .font(.headline)
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
-
-            HStack {
-                TextField("검색어 입력", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                Button("검색") {
-                    // 나중에 구현
+        DaumDicWebView(url: currentURL ?? URL(string: baseURL)!)
+            .id(webViewID)
+            .onReceive(NotificationCenter.default.publisher(for: .searchDictionary)) { notification in
+                if let word = notification.object as? String {
+                    searchText = word
+                    search()
                 }
-                .buttonStyle(.bordered)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 4)
+    }
 
-            Rectangle()
-                .fill(Color(.systemGroupedBackground))
-                .overlay(
-                    Text("사전 검색 결과가 여기에 표시됩니다")
-                        .foregroundColor(.gray)
-                )
-        }
+    private func search() {
+        guard !searchText.isEmpty else { return }
+        let encoded = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? searchText
+        let isKorean = searchText.unicodeScalars.contains { $0.value >= 0xAC00 && $0.value <= 0xD7A3 }
+        let dicType = isKorean ? "ee" : "eq"
+        currentURL = URL(string: "https://small.dic.daum.net/search.do?q=\(encoded)&dic=\(dicType)")
+        webViewID = UUID()
+    }
+}
+
+struct DaumDicWebView: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.allowsBackForwardNavigationGestures = true
+        webView.load(URLRequest(url: url))
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
     }
 }

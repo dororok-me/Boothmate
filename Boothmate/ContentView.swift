@@ -10,7 +10,6 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showGlossary = false
     @State private var tappedWord = ""
-    @State private var showAddGlossary = false
 
     var body: some View {
         GeometryReader { geo in
@@ -111,8 +110,8 @@ struct ContentView: View {
                                                                         textColor: speechManager.selectedTheme.textColor,
                                                                         glossaryStore: glossaryStore,
                                                                         onTapWord: { word in
-                                                                            tappedWord = word
-                                                                            showAddGlossary = true
+                                                                        tappedWord = word
+                                                                        NotificationCenter.default.post(name: .searchDictionary, object: word)
                                                                         }
                                                                     )
                                                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -128,8 +127,8 @@ struct ContentView: View {
                                                                         textColor: speechManager.selectedTheme.textColor.opacity(0.6),
                                                                         glossaryStore: glossaryStore,
                                                                         onTapWord: { word in
-                                                                            tappedWord = word
-                                                                            showAddGlossary = true
+                                                                        tappedWord = word
+                                                                        NotificationCenter.default.post(name: .searchDictionary, object: word)
                                                                         }
                                                                     )
                                                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -198,35 +197,33 @@ struct ContentView: View {
                     )
 
                 // MARK: - 오른쪽 파일 뷰어 + 사전
-                VStack(spacing: 0) {
-                    FileViewerView()
-                        .frame(maxWidth: .infinity, maxHeight: topHeight)
-                        .background(Color(UIColor.systemBackground))
-                        .clipped()
+                                VStack(spacing: 0) {
+                                    FileViewerView()
+                                        .frame(maxWidth: .infinity, maxHeight: topHeight)
+                                        .clipped()
 
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: handleWidth)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.gray)
-                                .frame(width: 30, height: 3)
-                        )
-                        .contentShape(Rectangle())
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                                .onChanged { value in
-                                    let new = value.location.y / geo.size.height
-                                    verticalSplit = min(max(new, 0.2), 0.8)
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(height: handleWidth)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(Color.gray)
+                                                .frame(width: 30, height: 3)
+                                        )
+                                        .contentShape(Rectangle())
+                                        .simultaneousGesture(
+                                            DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                                                .onChanged { value in
+                                                    let new = value.location.y / geo.size.height
+                                                    verticalSplit = min(max(new, 0.2), 0.8)
+                                                }
+                                        )
+
+                                    DictionaryView()
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                        .clipped()
                                 }
-                        )
-
-                    DictionaryView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .clipped()
-                }
-                .frame(width: rightWidth)
+                                .frame(width: rightWidth)
             }
         }
         .ignoresSafeArea()
@@ -238,15 +235,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSettings) {
                     SubtitleMenuView(speechManager: speechManager)
-                }
-                .alert("글로서리에 추가", isPresented: $showAddGlossary) {
-                    TextField("번역/설명", text: $tappedWord)
-                    Button("추가") {
-                        glossaryStore.add(source: tappedWord, target: "")
-                    }
-                    Button("취소", role: .cancel) {}
-                } message: {
-                    Text("'\(tappedWord)'을(를) 글로서리에 추가하시겠습니까?")
                 }
             }
         }
