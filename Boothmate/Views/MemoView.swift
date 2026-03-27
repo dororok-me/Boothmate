@@ -1,8 +1,13 @@
-//
-//  MemoView.swift
-//  Boothmate
-//
-//  Created by dororok on 3/27/26.
-//
+import SwiftUI
 
-import Foundation
+struct MemoView: View {
+    @State private var memoText = ""
+
+    var body: some View {
+        TextEditor(text: $memoText)
+            .font(.body)
+            .padding(8)
+            .scrollContentBackground(.hidden)
+            .background(Color(UIColor.systemBackground))
+    }
+}

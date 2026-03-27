@@ -7,11 +7,24 @@ import Combine
 @MainActor
 class SpeechManager: ObservableObject {
     @Published var subtitles: [String] = []
-    @Published var currentText: String = ""
+    @Published var currentText: String = "" // 실시간 인식 중인 텍스트
     @Published var isRecording: Bool = false
     @Published var selectedLanguage: String = "en-US"
-    @Published var fontSize: CGFloat = 20.0
-    @Published var selectedTheme: SubtitleTheme = .normal
+    @Published var fontSize: CGFloat = 22
+        @Published var selectedTheme: SubtitleTheme = .normal
+        
+        private let fontSizes: [CGFloat] = [16, 22, 28, 36]
+        private var fontSizeIndex: Int = 1
+        
+    func cycleFontSize() {
+            fontSizeIndex = (fontSizeIndex + 1) % fontSizes.count
+            fontSize = fontSizes[fontSizeIndex]
+        }
+    
+    // 🌟 글로서리 데이터 (UserDefaults 자동 저장)
+    @Published var glossary: [String: String] = [:] {
+        didSet { saveGlossaryToUserDefaults() }
+    }
 
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -23,60 +36,61 @@ class SpeechManager: ObservableObject {
         ("한국어", "ko-KR")
     ]
 
+    init() {
+        loadGlossaryFromUserDefaults()
+    }
+
+    // MARK: - 🌟 글로서리 변환 로직
+    func applyGlossary(to text: String) -> String {
+        var result = text
+        for (wrong, right) in glossary {
+            result = result.replacingOccurrences(of: wrong, with: right)
+        }
+        return result
+    }
+
+    // MARK: - 권한 요청
     func requestPermissions() {
         SFSpeechRecognizer.requestAuthorization { status in
             Task { @MainActor in
-                if status != .authorized {
-                    print("음성인식 권한이 거부되었습니다")
-                }
+                if status != .authorized { print("음성인식 권한 거부") }
             }
         }
-
         AVAudioApplication.requestRecordPermission { granted in
             Task { @MainActor in
-                if !granted {
-                    print("마이크 권한이 거부되었습니다")
-                }
+                if !granted { print("마이크 권한 거부") }
             }
         }
     }
 
+    // MARK: - 녹음 시작 (실시간 로직 포함)
     func startRecording() {
         stopRecording()
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
-
-        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
-            print("음성인식을 사용할 수 없습니다")
-            return
-        }
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else { return }
 
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.record, mode: .measurement, options: [.duckOthers, .allowBluetooth])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                        
-            // USB-C 외장 마이크 우선 사용
+            
             if let preferredInput = audioSession.availableInputs?.first(where: { $0.portType == .usbAudio }) {
-            try audioSession.setPreferredInput(preferredInput)
-                        }
+                try audioSession.setPreferredInput(preferredInput)
+            }
 
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-
             guard let recognitionRequest = recognitionRequest else { return }
-
             recognitionRequest.shouldReportPartialResults = true
 
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
-
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
 
             audioEngine.prepare()
             try audioEngine.start()
-
             isRecording = true
 
             recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
@@ -84,29 +98,26 @@ class SpeechManager: ObservableObject {
                     guard let self = self else { return }
 
                     if let result = result {
-                        self.currentText = result.bestTranscription.formattedString
+                        // ✅ 핵심: 실시간(Partial) 결과도 즉시 반영하여 화면에 보여줌
+                        let rawText = result.bestTranscription.formattedString
+                        self.currentText = self.applyGlossary(to: rawText)
 
                         if result.isFinal {
                             if !self.currentText.isEmpty {
                                 self.subtitles.append(self.currentText)
                             }
-                            self.currentText = ""
-                            if self.isRecording {
-                                self.restartRecording()
-                            }
+                            self.currentText = "" // 확정되었으므로 비움
+                            if self.isRecording { self.restartRecording() }
                         }
                     }
 
-                    if let error = error {
-                        print("인식 에러: \(error.localizedDescription)")
-                        if self.isRecording {
-                            self.restartRecording()
-                        }
+                    if error != nil && self.isRecording {
+                        self.restartRecording()
                     }
                 }
             }
         } catch {
-            print("오디오 엔진 에러: \(error.localizedDescription)")
+            print("에러: \(error.localizedDescription)")
         }
     }
 
@@ -135,9 +146,7 @@ class SpeechManager: ObservableObject {
 
         Task {
             try? await Task.sleep(nanoseconds: 300_000_000)
-            if self.isRecording {
-                self.startRecording()
-            }
+            if self.isRecording { self.startRecording() }
         }
     }
 
@@ -145,11 +154,38 @@ class SpeechManager: ObservableObject {
         subtitles.removeAll()
         currentText = ""
     }
+
+    // MARK: - 데이터 관리
+    func importGlossary(from url: URL, overwrite: Bool) {
+        guard let data = try? Data(contentsOf: url),
+              let content = String(data: data, encoding: .utf8) else { return }
+        var imported: [String: String] = [:]
+        let lines = content.components(separatedBy: .newlines)
+        for line in lines where !line.isEmpty {
+            let cols = line.components(separatedBy: ",")
+            if cols.count >= 2 {
+                imported[cols[0].trimmingCharacters(in: .whitespaces)] = cols[1].trimmingCharacters(in: .whitespaces)
+            }
+        }
+        if overwrite { self.glossary = imported }
+        else { self.glossary.merge(imported) { (_, new) in new } }
+    }
+
+    private func saveGlossaryToUserDefaults() {
+        if let encoded = try? JSONEncoder().encode(glossary) {
+            UserDefaults.standard.set(encoded, forKey: "boothmate_glossary")
+        }
+    }
+
+    private func loadGlossaryFromUserDefaults() {
+        if let data = UserDefaults.standard.data(forKey: "boothmate_glossary"),
+           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
+            self.glossary = decoded
+        }
+    }
 }
 
-// MARK: - 테마 열거형 추가 (가장 하단에 작성)
-// SpeechManager.swift 파일 하단의 SubtitleTheme 열거형 수정
-
+// MARK: - 테마 설정
 enum SubtitleTheme: String, CaseIterable, Identifiable {
     case normal = "Normal View"
     case night = "Night View"
@@ -157,34 +193,30 @@ enum SubtitleTheme: String, CaseIterable, Identifiable {
     
     var id: String { self.rawValue }
     
-    // 테마별 배경색 (동일)
     var backgroundColor: Color {
         switch self {
-        case .normal: return Color.white
-        case .night: return Color.black
+        case .normal: return .white
+        case .night: return .black
         case .legal: return Color(red: 1.0, green: 1.0, blue: 0.8)
         }
     }
     
-    // 테마별 텍스트 색상 (동일)
     var textColor: Color {
         switch self {
-        case .normal: return Color.black
-        case .night: return Color.white
+        case .normal: return .black
+        case .night: return .white
         case .legal: return Color(red: 0.0, green: 0.0, blue: 0.5)
         }
     }
 
-    // 🌟 테마별 아이콘(톱니바퀴 등) 색상 추가
     var iconColor: Color {
         switch self {
-        case .normal: return Color.black    // 일반: 검은색
-        case .night: return Color.white     // 나이트: 흰색
-        case .legal: return Color(red: 0.0, green: 0.0, blue: 0.5) // 리걸패드: 남색 (텍스트와 동일)
+        case .normal: return .black
+        case .night: return .white
+        case .legal: return Color(red: 0.0, green: 0.0, blue: 0.5)
         }
     }
     
-    // 리걸 패드용 줄무늬 색상 (동일)
     var lineColor: Color {
         return Color.red.opacity(0.3)
     }
