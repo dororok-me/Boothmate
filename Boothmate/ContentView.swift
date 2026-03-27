@@ -9,6 +9,8 @@ struct ContentView: View {
     @State private var memoSplit: CGFloat = 0.85
     @State private var showSettings = false
     @State private var showGlossary = false
+    @State private var tappedWord = ""
+    @State private var showAddGlossary = false
 
     var body: some View {
         GeometryReader { geo in
@@ -103,26 +105,38 @@ struct ContentView: View {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 24) {
                                 ForEach(Array(speechManager.subtitles.enumerated()), id: \.offset) { index, subtitle in
-                                    Text(subtitle)
-                                        .font(.system(size: speechManager.fontSize, weight: .medium))
-                                        .foregroundColor(speechManager.selectedTheme.textColor)
-                                        .lineSpacing(8)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.leading, max(geo.safeAreaInsets.leading, 60))
-                                        .padding(.trailing, 20)
-                                        .id(index)
-                                }
+                                                                    SubtitleTextView(
+                                                                        text: subtitle,
+                                                                        fontSize: speechManager.fontSize,
+                                                                        textColor: speechManager.selectedTheme.textColor,
+                                                                        glossaryStore: glossaryStore,
+                                                                        onTapWord: { word in
+                                                                            tappedWord = word
+                                                                            showAddGlossary = true
+                                                                        }
+                                                                    )
+                                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                                    .padding(.leading, max(geo.safeAreaInsets.leading, 60))
+                                                                    .padding(.trailing, 20)
+                                                                    .id(index)
+                                                                }
 
-                                if !speechManager.currentText.isEmpty {
-                                    Text(speechManager.currentText)
-                                        .font(.system(size: speechManager.fontSize, weight: .medium))
-                                        .foregroundColor(speechManager.selectedTheme.textColor.opacity(0.6))
-                                        .lineSpacing(8)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.leading, max(geo.safeAreaInsets.leading, 60))
-                                        .padding(.trailing, 20)
-                                        .id("current")
-                                }
+                                                                if !speechManager.currentText.isEmpty {
+                                                                    SubtitleTextView(
+                                                                        text: speechManager.currentText,
+                                                                        fontSize: speechManager.fontSize,
+                                                                        textColor: speechManager.selectedTheme.textColor.opacity(0.6),
+                                                                        glossaryStore: glossaryStore,
+                                                                        onTapWord: { word in
+                                                                            tappedWord = word
+                                                                            showAddGlossary = true
+                                                                        }
+                                                                    )
+                                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                                    .padding(.leading, max(geo.safeAreaInsets.leading, 60))
+                                                                    .padding(.trailing, 20)
+                                                                    .id("current")
+                                                                }
 
                                 Color.clear.frame(height: 10).id("bottom")
                             }
@@ -223,7 +237,16 @@ struct ContentView: View {
             GlossaryView(glossaryStore: glossaryStore)
         }
         .sheet(isPresented: $showSettings) {
-            SubtitleMenuView(speechManager: speechManager)
+                    SubtitleMenuView(speechManager: speechManager)
+                }
+                .alert("글로서리에 추가", isPresented: $showAddGlossary) {
+                    TextField("번역/설명", text: $tappedWord)
+                    Button("추가") {
+                        glossaryStore.add(source: tappedWord, target: "")
+                    }
+                    Button("취소", role: .cancel) {}
+                } message: {
+                    Text("'\(tappedWord)'을(를) 글로서리에 추가하시겠습니까?")
+                }
+            }
         }
-    }
-}
