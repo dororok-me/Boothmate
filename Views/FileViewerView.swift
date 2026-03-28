@@ -13,24 +13,14 @@ struct FileViewerView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button(action: {
-                    pickFile()
-                }) {
-                    Image(systemName: "plus")
-                        .font(.title2)
-                }
-
-                Spacer()
-
-                if isDownloading {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
-            }
-            .padding()
-            .background(Color(.systemGray6))
-
-            Divider()
+                            Spacer()
+                            Button(action: { pickFile() }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(6)
+                        }
 
             if let url = selectedURL {
                 QuickLookPreview(url: url)
