@@ -32,8 +32,22 @@ struct SubtitleTextView: View {
         }
     }
 
+<<<<<<< HEAD
     private func pieceView(_ piece: DisplayPiece) -> some View {
         Text(piece.text)
+=======
+    private func wordView(_ word: String) -> some View {
+            let cleaned = word
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: .punctuationCharacters)
+
+            // 양방향: source 또는 target 모두 하이라이트
+            let isSource = glossaryStore.hasSource(cleaned)
+            let isTarget = glossaryStore.hasTarget(cleaned)
+            let isGlossary = isSource || isTarget
+
+            return Text(word)
+>>>>>>> temp-branch
             .font(.system(size: fontSize, weight: .medium))
             .foregroundColor(piece.isGlossary ? .orange : textColor)
             .padding(.horizontal, 2)
