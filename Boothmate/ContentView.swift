@@ -374,7 +374,7 @@ struct ContentView: View {
     private func subtitleArea(leftDangerInset: CGFloat) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: speechManager.lineSpacing) {
                     ForEach(speechManager.subtitles.indices, id: \.self) { index in
                         subtitleBlock(
                             text: speechManager.subtitles[index],
@@ -422,13 +422,14 @@ struct ContentView: View {
 
     private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
         TappableText(
-            text: text,
-            fontSize: speechManager.fontSize,
-            textColor: speechManager.selectedTheme.textColor.opacity(opacity),
-            glossaryColor: speechManager.glossaryEnabled
-                ? speechManager.glossaryColor.color
-                : speechManager.selectedTheme.textColor.opacity(opacity)
-        ) { word in
+                    text: text,
+                    fontSize: speechManager.fontSize,
+                    textColor: speechManager.selectedTheme.textColor.opacity(opacity),
+                    glossaryColor: speechManager.glossaryEnabled
+                        ? speechManager.glossaryColor.color
+                        : speechManager.selectedTheme.textColor.opacity(opacity),
+                    lineSpacing: speechManager.lineSpacing
+                ) { word in
             NotificationCenter.default.post(
                 name: .searchDictionary,
                 object: word

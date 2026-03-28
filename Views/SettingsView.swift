@@ -49,21 +49,31 @@ struct SettingsView: View {
     }
 
     private var fontSection: some View {
-        Section("Font Size") {
-            HStack {
-                Text("Current Size")
-                Spacer()
-                Text("\(Int(speechManager.fontSize))")
-                    .foregroundColor(.secondary)
+            Section("Font Size & Line Spacing") {
+                HStack {
+                    Text("Font Size")
+                    Spacer()
+                    Text("\(Int(speechManager.fontSize))")
+                        .foregroundColor(.secondary)
+                }
+
+                Slider(value: $speechManager.fontSize, in: 16...36, step: 1)
+
+                HStack {
+                    Text("Line Spacing")
+                    Spacer()
+                    Text("\(Int(speechManager.lineSpacing))")
+                        .foregroundColor(.secondary)
+                }
+
+                Slider(value: $speechManager.lineSpacing, in: 0...30, step: 2)
+
+                Text("Preview Text\nSecond line here")
+                    .font(.system(size: speechManager.fontSize))
+                    .lineSpacing(speechManager.lineSpacing)
+                    .padding(.vertical, 6)
             }
-
-            Slider(value: $speechManager.fontSize, in: 16...36, step: 1)
-
-            Text("Preview Text")
-                .font(.system(size: speechManager.fontSize))
-                .padding(.vertical, 6)
         }
-    }
 
     private var themeSection: some View {
         Section("Theme") {

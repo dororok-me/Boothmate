@@ -1,49 +1,70 @@
 import SwiftUI
+import WebKit
 import QuickLook
 import UniformTypeIdentifiers
 import UIKit
 
 struct FileViewerView: View {
     @State private var selectedURL: URL?
+    @State private var fileType: FileType = .none
     @State private var isDownloading = false
     @State private var showAlert = false
     @State private var alertMessage = ""
     @State private var pickerDelegate: DocumentPickerDelegate?
 
+    enum FileType {
+        case none, webviewable, image, other
+    }
+
     var body: some View {
-            ZStack {
+        ZStack {
+            switch fileType {
+            case .none:
+                Color(UIColor.systemBackground)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            case .webviewable:
                 if let url = selectedURL {
-                    QuickLookPreview(url: url)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    Color(UIColor.systemBackground)
+                    WebDocumentView(url: url)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
-                // 중앙 폴더 아이콘 (항상 표시, 파일 위에 플로팅)
-                Button(action: { pickFile() }) {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 30))
-                        .foregroundColor(.gray.opacity(0.3))
+            case .image:
+                if let url = selectedURL,
+                   let data = try? Data(contentsOf: url),
+                   let uiImage = UIImage(data: data) {
+                    ZoomableImageView(image: uiImage)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .buttonStyle(.plain)
 
-                if isDownloading {
+            case .other:
+                if let url = selectedURL {
+                    QuickLookFallback(url: url)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+
+            if isDownloading {
+                VStack {
                     ProgressView()
-                        .scaleEffect(0.8)
+                    Text("다운로드 중...")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.top, 4)
                 }
-            }
-            .clipped()
-            .alert("파일 열기 실패", isPresented: $showAlert) {
-                Button("확인", role: .cancel) {}
-            } message: {
-                Text(alertMessage)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .openFilePicker)) { _ in
-                pickFile()
             }
         }
-    
+        .clipped()
+        .alert("파일 열기 실패", isPresented: $showAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openFilePicker)) { _ in
+            pickFile()
+        }
+    }
+
     private func pickFile() {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item])
         picker.allowsMultipleSelection = false
@@ -61,7 +82,12 @@ struct FileViewerView: View {
             return
         }
 
-        rootVC.present(picker, animated: true)
+        var topVC = rootVC
+        while let presented = topVC.presentedViewController {
+            topVC = presented
+        }
+
+        topVC.present(picker, animated: true)
     }
 
     private func handlePickedFile(_ url: URL) {
@@ -118,10 +144,25 @@ struct FileViewerView: View {
         do {
             try FileManager.default.copyItem(at: url, to: localURL)
             url.stopAccessingSecurityScopedResource()
-            selectedURL = localURL
+            openFile(localURL)
         } catch {
-            selectedURL = url
+            openFile(url)
         }
+    }
+
+    private func openFile(_ url: URL) {
+        let ext = url.pathExtension.lowercased()
+
+        switch ext {
+        case "pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx", "hwp", "hwpx":
+            fileType = .webviewable
+        case "jpg", "jpeg", "png", "gif", "heic", "heif", "bmp", "tiff":
+            fileType = .image
+        default:
+            fileType = .other
+        }
+
+        selectedURL = url
     }
 
     private func isFileDownloaded(_ url: URL) -> Bool {
@@ -143,20 +184,87 @@ struct FileViewerView: View {
     }
 }
 
-struct QuickLookPreview: UIViewControllerRepresentable {
+// MARK: - WebView로 문서 열기 (PDF, PPT, DOCX, HWP, Excel)
+
+struct WebDocumentView: UIViewRepresentable {
     let url: URL
 
-    func makeUIViewController(context: Context) -> UINavigationController {
-        let controller = QLPreviewController()
-        controller.dataSource = context.coordinator
-        let nav = UINavigationController(rootViewController: controller)
-        nav.setNavigationBarHidden(true, animated: false)
-        return nav
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.scrollView.minimumZoomScale = 0.5
+        webView.scrollView.maximumZoomScale = 5.0
+        webView.scrollView.bouncesZoom = true
+        webView.load(URLRequest(url: url))
+        return webView
     }
 
-    func updateUIViewController(_ nav: UINavigationController, context: Context) {
-        nav.setNavigationBarHidden(true, animated: false)
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+}
+
+// MARK: - 핀치 줌 가능한 이미지 뷰어
+
+struct ZoomableImageView: UIViewRepresentable {
+    let image: UIImage
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.minimumZoomScale = 0.5
+        scrollView.maximumZoomScale = 5.0
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.delegate = context.coordinator
+
+        let imageView = UIImageView(image: image)
+        imageView.contentMode = .scaleAspectFit
+        imageView.tag = 100
+        scrollView.addSubview(imageView)
+
+        return scrollView
     }
+
+    func updateUIView(_ scrollView: UIScrollView, context: Context) {
+        guard let imageView = scrollView.viewWithTag(100) as? UIImageView else { return }
+        imageView.frame = scrollView.bounds
+        imageView.image = image
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject, UIScrollViewDelegate {
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            scrollView.viewWithTag(100)
+        }
+    }
+}
+
+// MARK: - QuickLook 폴백 (기타 파일)
+
+struct QuickLookFallback: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+
+        let container = UIViewController()
+        container.addChild(controller)
+        container.view.addSubview(controller.view)
+        controller.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            controller.view.topAnchor.constraint(equalTo: container.view.topAnchor),
+            controller.view.bottomAnchor.constraint(equalTo: container.view.bottomAnchor),
+            controller.view.leadingAnchor.constraint(equalTo: container.view.leadingAnchor),
+            controller.view.trailingAnchor.constraint(equalTo: container.view.trailingAnchor)
+        ])
+        controller.didMove(toParent: container)
+
+        return container
+    }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(url: url)
@@ -176,6 +284,8 @@ struct QuickLookPreview: UIViewControllerRepresentable {
         }
     }
 }
+
+// MARK: - Document Picker Delegate
 
 final class DocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
     let onPick: (URL) -> Void

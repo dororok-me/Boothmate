@@ -12,6 +12,7 @@ class SpeechManager: ObservableObject {
         @Published var isRecording: Bool = false
         @Published var selectedLanguage: String = "en-US"
         @Published var fontSize: CGFloat = 22
+        @Published var lineSpacing: CGFloat = 8
         @Published var selectedTheme: SubtitleTheme = .normal
         @Published var elapsedSeconds: Int = 0
         @Published var isPaused: Bool = false

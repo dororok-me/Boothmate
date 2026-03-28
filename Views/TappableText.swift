@@ -5,6 +5,7 @@ struct TappableText: UIViewRepresentable {
     let fontSize: CGFloat
     let textColor: Color
     let glossaryColor: Color
+    let lineSpacing: CGFloat
     let onTapWord: (String) -> Void
 
     func makeUIView(context: Context) -> UILabel {
@@ -29,20 +30,26 @@ struct TappableText: UIViewRepresentable {
 
     private func buildAttributedString() -> NSAttributedString {
         let result = NSMutableAttributedString()
+
+        let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineSpacing = lineSpacing
+
         let baseAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: .medium),
-            .foregroundColor: UIColor(textColor)
+            .foregroundColor: UIColor(textColor),
+            .paragraphStyle: paragraphStyle
         ]
+
         let glossaryAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: .medium),
-            .foregroundColor: UIColor(glossaryColor)
+            .foregroundColor: UIColor(glossaryColor),
+            .paragraphStyle: paragraphStyle
         ]
 
         var i = text.startIndex
         while i < text.endIndex {
             let c = text[i]
             if c == "(" {
-                // 괄호 시작 찾기
                 if let closeIndex = text[i...].firstIndex(of: ")") {
                     let bracket = String(text[i...closeIndex])
                     result.append(NSAttributedString(string: bracket, attributes: glossaryAttrs))
