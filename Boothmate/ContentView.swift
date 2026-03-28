@@ -276,25 +276,38 @@ struct ContentView: View {
     }
 
     private var recordButton: some View {
-        Button {
-            if speechManager.isRecording {
-                speechManager.stopRecording()
-            } else {
-                speechManager.startRecording()
-            }
-        } label: {
-            ZStack {
-                Circle()
-                    .fill(speechManager.isRecording ? Color.red : Color.red.opacity(0.12))
-                    .frame(width: 32, height: 32)
+            HStack(spacing: 4) {
+                Button {
+                    if speechManager.isRecording {
+                        speechManager.stopRecording()
+                    } else {
+                        speechManager.startRecording()
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(speechManager.isRecording ? Color.red : Color.red.opacity(0.12))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: speechManager.isRecording ? "stop.fill" : "mic.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(speechManager.isRecording ? .white : .red)
+                    }
+                }
+                .buttonStyle(.plain)
 
-                Image(systemName: speechManager.isRecording ? "stop.fill" : "mic.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(speechManager.isRecording ? .white : .red)
+                if speechManager.isRecording {
+                    VStack(spacing: 0) {
+                        Text(String(format: "%02d", speechManager.elapsedSeconds / 60))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                        Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(width: 20)
+                }
             }
         }
-        .buttonStyle(.plain)
-    }
 
     private func toolbarIconButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {

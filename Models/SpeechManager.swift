@@ -7,17 +7,21 @@ import Combine
 @MainActor
 class SpeechManager: ObservableObject {
     @Published var subtitles: [String] = []
-    @Published var currentText: String = ""
-    @Published var isRecording: Bool = false
-    @Published var selectedLanguage: String = "en-US"
-    @Published var fontSize: CGFloat = 22
-    @Published var selectedTheme: SubtitleTheme = .normal
+        var allSubtitles: [String] = []
+        @Published var currentText: String = ""
+        @Published var isRecording: Bool = false
+        @Published var selectedLanguage: String = "en-US"
+        @Published var fontSize: CGFloat = 22
+        @Published var selectedTheme: SubtitleTheme = .normal
+        @Published var elapsedSeconds: Int = 0
 
-    weak var glossaryStore: GlossaryStore?
+        weak var glossaryStore: GlossaryStore?
 
-    private let fontSizes: [CGFloat] = [16, 22, 28, 36]
-    private var fontSizeIndex: Int = 1
-
+        private let maxDisplayLines = 10
+        private let fontSizes: [CGFloat] = [16, 22, 28, 36]
+        private var fontSizeIndex: Int = 1
+        private var timer: Timer?
+    
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
@@ -88,7 +92,11 @@ class SpeechManager: ObservableObject {
 
             audioEngine.prepare()
             try audioEngine.start()
-            isRecording = true
+            isRecording = false
+
+                    // 타이머 중지
+                    timer?.invalidate()
+                    timer = nil
 
             recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 Task { @MainActor in
@@ -96,12 +104,15 @@ class SpeechManager: ObservableObject {
 
                     if let result = result {
                         let rawText = result.bestTranscription.formattedString
-                        self.currentText = rawText
+                        self.currentText = self.applyGlossary(to: rawText)
 
                         if result.isFinal {
-                            let trimmed = self.currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !trimmed.isEmpty {
+                            if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                self.allSubtitles.append(self.currentText)
                                 self.subtitles.append(self.currentText)
+                                if self.subtitles.count > self.maxDisplayLines {
+                                    self.subtitles.removeFirst(self.subtitles.count - self.maxDisplayLines)
+                                }
                             }
                             self.currentText = ""
                         }
@@ -131,7 +142,11 @@ class SpeechManager: ObservableObject {
 
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
+            allSubtitles.append(currentText)
             subtitles.append(currentText)
+            if subtitles.count > maxDisplayLines {
+                subtitles.removeFirst(subtitles.count - maxDisplayLines)
+            }
         }
         currentText = ""
     }
@@ -154,58 +169,57 @@ class SpeechManager: ObservableObject {
 
     func clearSubtitles() {
         subtitles.removeAll()
+        allSubtitles.removeAll()
         currentText = ""
     }
-<<<<<<< HEAD
-}
-=======
+
+    func exportAllSubtitles() -> String {
+        return allSubtitles.joined(separator: "\n")
+    }
 
     private func applyGlossary(to text: String) -> String {
-            guard let glossaryStore = glossaryStore else { return text }
-            guard !glossaryStore.entries.isEmpty else { return text }
+        guard let glossaryStore = glossaryStore else { return text }
+        guard !glossaryStore.entries.isEmpty else { return text }
 
-            // 단어 단위로 분리
-            let words = text.components(separatedBy: " ")
-            var result: [String] = []
+        let words = text.components(separatedBy: " ")
+        var result: [String] = []
 
-            for word in words {
-                // 구두점 분리 (앞뒤)
-                let leading = String(word.prefix(while: { $0.isPunctuation || $0.isWhitespace }))
-                let trailing = String(word.reversed().prefix(while: { $0.isPunctuation || $0.isWhitespace }).reversed())
-                let startIndex = word.index(word.startIndex, offsetBy: leading.count)
-                let endIndex = word.index(word.endIndex, offsetBy: -trailing.count)
-                let clean = startIndex < endIndex ? String(word[startIndex..<endIndex]) : word
+        for word in words {
+            let leading = String(word.prefix(while: { $0.isPunctuation || $0.isWhitespace }))
+            let trailing = String(word.reversed().prefix(while: { $0.isPunctuation || $0.isWhitespace }).reversed())
+            let startIndex = word.index(word.startIndex, offsetBy: leading.count)
+            let endIndex = word.index(word.endIndex, offsetBy: -trailing.count)
+            let clean = startIndex < endIndex ? String(word[startIndex..<endIndex]) : word
 
-                var matched = false
+            var matched = false
 
-                for entry in glossaryStore.entries {
-                    let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !source.isEmpty, !target.isEmpty else { continue }
+            for entry in glossaryStore.entries {
+                let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
+                let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !source.isEmpty, !target.isEmpty else { continue }
 
-                    if clean.localizedCaseInsensitiveCompare(source) == .orderedSame {
-                        result.append("\(leading)\(clean)(\(target))\(trailing)")
-                        matched = true
-                        break
-                    }
-                    else if clean.localizedCaseInsensitiveCompare(target) == .orderedSame {
-                        result.append("\(leading)\(clean)(\(source))\(trailing)")
-                        matched = true
-                        break
-                    }
+                if clean.localizedCaseInsensitiveCompare(source) == .orderedSame {
+                    result.append("\(leading)\(clean)(\(target))\(trailing)")
+                    matched = true
+                    break
                 }
-
-                if !matched {
-                    result.append(word)
+                else if clean.localizedCaseInsensitiveCompare(target) == .orderedSame {
+                    result.append("\(leading)\(clean)(\(source))\(trailing)")
+                    matched = true
+                    break
                 }
             }
 
-            return result.joined(separator: " ")
+            if !matched {
+                result.append(word)
+            }
         }
-    }
->>>>>>> temp-branch
 
-    enum SubtitleTheme: String, CaseIterable, Identifiable {
+        return result.joined(separator: " ")
+    }
+}
+
+enum SubtitleTheme: String, CaseIterable, Identifiable {
     case normal = "Normal View"
     case night = "Night View"
     case legal = "Legal Pad"
@@ -214,34 +228,25 @@ class SpeechManager: ObservableObject {
 
     var backgroundColor: Color {
         switch self {
-        case .normal:
-            return .white
-        case .night:
-            return .black
-        case .legal:
-            return Color(red: 1.0, green: 1.0, blue: 0.8)
+        case .normal: return .white
+        case .night: return .black
+        case .legal: return Color(red: 1.0, green: 1.0, blue: 0.8)
         }
     }
 
     var textColor: Color {
         switch self {
-        case .normal:
-            return .black
-        case .night:
-            return .white
-        case .legal:
-            return Color(red: 0.0, green: 0.0, blue: 0.5)
+        case .normal: return .black
+        case .night: return .white
+        case .legal: return Color(red: 0.0, green: 0.0, blue: 0.5)
         }
     }
 
     var iconColor: Color {
         switch self {
-        case .normal:
-            return .black
-        case .night:
-            return .white
-        case .legal:
-            return Color(red: 0.0, green: 0.0, blue: 0.5)
+        case .normal: return .black
+        case .night: return .white
+        case .legal: return Color(red: 0.0, green: 0.0, blue: 0.5)
         }
     }
 
