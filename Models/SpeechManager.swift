@@ -30,9 +30,11 @@ class SpeechManager: ObservableObject {
     private let audioEngine = AVAudioEngine()
 
     let languages = [
-        ("English", "en-US"),
-        ("한국어", "ko-KR")
-    ]
+            ("KR", "ko-KR"),
+            ("EN", "en-US"),
+            ("JP", "ja-JP"),
+            ("CN", "zh-CN")
+        ]
 
     func cycleFontSize() {
         fontSizeIndex = (fontSizeIndex + 1) % fontSizes.count

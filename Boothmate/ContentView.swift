@@ -211,30 +211,22 @@ struct ContentView: View {
     // MARK: - Language Toggle
 
     private var languageToggle: some View {
-        HStack(spacing: 0) {
-            Button {
-                speechManager.selectedLanguage = "en-US"
-            } label: {
-                Text("EN")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 42, height: 32)
-                    .background(speechManager.selectedLanguage == "en-US" ? Color.blue : Color.clear)
-                    .foregroundColor(speechManager.selectedLanguage == "en-US" ? .white : .primary)
+            HStack(spacing: 0) {
+                ForEach(speechManager.languages, id: \.1) { name, code in
+                    Button {
+                        speechManager.selectedLanguage = code
+                    } label: {
+                        Text(name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .frame(width: 32, height: 28)
+                            .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
+                            .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
+                    }
+                }
             }
-
-            Button {
-                speechManager.selectedLanguage = "ko-KR"
-            } label: {
-                Text("KR")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 42, height: 32)
-                    .background(speechManager.selectedLanguage == "ko-KR" ? Color.blue : Color.clear)
-                    .foregroundColor(speechManager.selectedLanguage == "ko-KR" ? .white : .primary)
-            }
+            .background(Color.gray.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .background(Color.gray.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-    }
 
     // MARK: - Font Size Button
 
