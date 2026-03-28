@@ -27,24 +27,17 @@ struct ContentView: View {
         GeometryReader { geo in
             let totalWidth = geo.size.width
             let totalHeight = geo.size.height
-
             let safeTop = geo.safeAreaInsets.top
             let safeLeading = geo.safeAreaInsets.leading
-
             let isLandscape = totalWidth > totalHeight
-
-            // 다이나믹 아일랜드/노치 회피용 내부 여백
             let leftDangerInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
-
             let topSafeSpacing = safeTop + 8
 
-            // 좌우 분할 계산은 전체 폭 기준으로 유지
             let leftWidth = clamp(
                 value: (totalWidth - dividerHitThickness) * horizontalSplit,
                 minValue: minPaneWidth,
                 maxValue: totalWidth - dividerHitThickness - minPaneWidth
             )
-
             let rightWidth = totalWidth - leftWidth - dividerHitThickness
 
             let leftContentHeight = totalHeight - topSafeSpacing - topBarHeight - dividerHitThickness
@@ -55,7 +48,6 @@ struct ContentView: View {
                 minValue: minPaneHeight,
                 maxValue: leftContentHeight - minPaneHeight
             )
-
             let leftBottomHeight = leftContentHeight - leftTopHeight
 
             let rightTopHeight = clamp(
@@ -63,10 +55,10 @@ struct ContentView: View {
                 minValue: minPaneHeight,
                 maxValue: rightContentHeight - minPaneHeight
             )
-
             let rightBottomHeight = rightContentHeight - rightTopHeight
 
             HStack(spacing: 0) {
+                // MARK: - 왼쪽: 자막 + 메모
                 VStack(spacing: 0) {
                     topBar(leftDangerInset: leftDangerInset)
                         .frame(height: topBarHeight)
@@ -85,12 +77,9 @@ struct ContentView: View {
                                     if leftVerticalSplitDragStart == nil {
                                         leftVerticalSplitDragStart = leftVerticalSplit
                                     }
-
                                     guard let start = leftVerticalSplitDragStart else { return }
-
                                     let delta = value.translation.height / leftContentHeight
                                     let newSplit = start + delta
-
                                     withTransaction(Transaction(animation: nil)) {
                                         leftVerticalSplit = clamp(
                                             value: newSplit,
@@ -109,6 +98,7 @@ struct ContentView: View {
                         .background(Color(.systemBackground))
                 }
 
+                // MARK: - 좌우 드래그 핸들
                 verticalDragHandle
                     .frame(width: dividerHitThickness, height: totalHeight)
                     .contentShape(Rectangle())
@@ -118,12 +108,9 @@ struct ContentView: View {
                                 if horizontalSplitDragStart == nil {
                                     horizontalSplitDragStart = horizontalSplit
                                 }
-
                                 guard let start = horizontalSplitDragStart else { return }
-
                                 let delta = value.translation.width / (totalWidth - dividerHitThickness)
                                 let newSplit = start + delta
-
                                 withTransaction(Transaction(animation: nil)) {
                                     horizontalSplit = clamp(
                                         value: newSplit,
@@ -137,6 +124,7 @@ struct ContentView: View {
                             }
                     )
 
+                // MARK: - 오른쪽: 파일뷰어 + 사전
                 VStack(spacing: 0) {
                     FileViewerView()
                         .frame(width: rightWidth, height: rightTopHeight)
@@ -151,12 +139,9 @@ struct ContentView: View {
                                     if rightVerticalSplitDragStart == nil {
                                         rightVerticalSplitDragStart = rightVerticalSplit
                                     }
-
                                     guard let start = rightVerticalSplitDragStart else { return }
-
                                     let delta = value.translation.height / rightContentHeight
                                     let newSplit = start + delta
-
                                     withTransaction(Transaction(animation: nil)) {
                                         rightVerticalSplit = clamp(
                                             value: newSplit,
@@ -190,6 +175,8 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Top Bar
+
     private func topBar(leftDangerInset: CGFloat) -> some View {
         HStack(spacing: 8) {
             Spacer()
@@ -200,10 +187,6 @@ struct ContentView: View {
 
             toolbarIconButton(systemName: "arrow.counterclockwise") {
                 speechManager.clearSubtitles()
-            }
-
-            toolbarIconButton(systemName: "keyboard.chevron.compact.down") {
-                dismissKeyboard()
             }
 
             toolbarIconButton(systemName: "gearshape") {
@@ -225,6 +208,8 @@ struct ContentView: View {
         .background(Color.clear)
     }
 
+    // MARK: - Language Toggle
+
     private var languageToggle: some View {
         HStack(spacing: 0) {
             Button {
@@ -233,12 +218,8 @@ struct ContentView: View {
                 Text("EN")
                     .font(.system(size: 14, weight: .semibold))
                     .frame(width: 42, height: 32)
-                    .background(
-                        speechManager.selectedLanguage == "en-US" ? Color.blue : Color.clear
-                    )
-                    .foregroundColor(
-                        speechManager.selectedLanguage == "en-US" ? .white : .primary
-                    )
+                    .background(speechManager.selectedLanguage == "en-US" ? Color.blue : Color.clear)
+                    .foregroundColor(speechManager.selectedLanguage == "en-US" ? .white : .primary)
             }
 
             Button {
@@ -247,27 +228,23 @@ struct ContentView: View {
                 Text("KR")
                     .font(.system(size: 14, weight: .semibold))
                     .frame(width: 42, height: 32)
-                    .background(
-                        speechManager.selectedLanguage == "ko-KR" ? Color.blue : Color.clear
-                    )
-                    .foregroundColor(
-                        speechManager.selectedLanguage == "ko-KR" ? .white : .primary
-                    )
+                    .background(speechManager.selectedLanguage == "ko-KR" ? Color.blue : Color.clear)
+                    .foregroundColor(speechManager.selectedLanguage == "ko-KR" ? .white : .primary)
             }
         }
         .background(Color.gray.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 11))
     }
 
+    // MARK: - Font Size Button
+
     private var fontSizeButton: some View {
         Button {
             speechManager.cycleFontSize()
         } label: {
-            HStack(spacing: 1) {
-                Text("a")
-                    .font(.system(size: 12, weight: .medium))
-                Text("A")
-                    .font(.system(size: 21, weight: .bold))
+            HStack(spacing: 0) {
+                Text("A").font(.system(size: 13, weight: .medium))
+                Text("A").font(.system(size: 20, weight: .bold))
             }
             .foregroundColor(.primary)
             .frame(width: 38, height: 32)
@@ -275,38 +252,42 @@ struct ContentView: View {
         .buttonStyle(.plain)
     }
 
-    private var recordButton: some View {
-            HStack(spacing: 4) {
-                Button {
-                    if speechManager.isRecording {
-                        speechManager.stopRecording()
-                    } else {
-                        speechManager.startRecording()
-                    }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(speechManager.isRecording ? Color.red : Color.green)
-                            .frame(width: 32, height: 32)
-                        Image(systemName: speechManager.isRecording ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .buttonStyle(.plain)
+    // MARK: - Record Button
 
-                VStack(spacing: 0) {
-                    Text(String(format: "%02d", speechManager.elapsedSeconds / 60))
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(speechManager.isRecording ? .red : .secondary)
-                    Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(speechManager.isRecording ? .red : .secondary)
+    private var recordButton: some View {
+        HStack(spacing: 4) {
+            Button {
+                if speechManager.isRecording {
+                    speechManager.stopRecording()
+                } else {
+                    speechManager.startRecording()
                 }
-                .frame(width: 20)
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(speechManager.isRecording ? Color.red : Color.green)
+                        .frame(width: 32, height: 32)
+                    Image(systemName: speechManager.isRecording ? "stop.fill" : "mic.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                }
             }
+            .buttonStyle(.plain)
+
+            VStack(spacing: 0) {
+                Text(String(format: "%02d", speechManager.elapsedSeconds / 60))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(speechManager.isRecording ? .red : .secondary)
+                Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(speechManager.isRecording ? .red : .secondary)
+            }
+            .frame(width: 20)
         }
-    
+    }
+
+    // MARK: - Toolbar Icon Button
+
     private func toolbarIconButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
@@ -316,6 +297,8 @@ struct ContentView: View {
         }
         .buttonStyle(.plain)
     }
+
+    // MARK: - Subtitle Area
 
     private func subtitleArea(leftDangerInset: CGFloat) -> some View {
         ScrollViewReader { proxy in
@@ -357,7 +340,7 @@ struct ContentView: View {
             }
         }
     }
-    
+
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         DispatchQueue.main.async {
             withAnimation(.easeOut(duration: 0.15)) {
@@ -366,13 +349,17 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Subtitle Block
+
     private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
-            TappableText(
-                text: text,
-                fontSize: speechManager.fontSize,
-                textColor: speechManager.selectedTheme.textColor.opacity(opacity),
-                glossaryColor: speechManager.glossaryEnabled ? speechManager.glossaryColor.color : speechManager.selectedTheme.textColor.opacity(opacity)
-            ) { word in
+        TappableText(
+            text: text,
+            fontSize: speechManager.fontSize,
+            textColor: speechManager.selectedTheme.textColor.opacity(opacity),
+            glossaryColor: speechManager.glossaryEnabled
+                ? speechManager.glossaryColor.color
+                : speechManager.selectedTheme.textColor.opacity(opacity)
+        ) { word in
             NotificationCenter.default.post(
                 name: Notification.Name.searchDictionary,
                 object: word,
@@ -384,44 +371,32 @@ struct ContentView: View {
         .padding(.trailing, 20)
     }
 
+    // MARK: - Drag Handles
+
     private var verticalDragHandle: some View {
         ZStack {
-            Rectangle()
-                .fill(Color.clear)
-
-            Rectangle()
-                .fill(Color.gray.opacity(0.14))
-                .frame(width: visibleDividerThickness)
-
-            Capsule()
-                .fill(Color.gray.opacity(0.55))
-                .frame(width: 4, height: 34)
+            Rectangle().fill(Color.clear)
+            Rectangle().fill(Color.gray.opacity(0.14)).frame(width: visibleDividerThickness)
+            Capsule().fill(Color.gray.opacity(0.55)).frame(width: 4, height: 34)
         }
         .contentShape(Rectangle())
     }
 
     private var horizontalDragHandle: some View {
         ZStack {
-            Rectangle()
-                .fill(Color.clear)
-
-            Rectangle()
-                .fill(Color.gray.opacity(0.14))
-                .frame(height: visibleDividerThickness)
-
-            Capsule()
-                .fill(Color.gray.opacity(0.55))
-                .frame(width: 34, height: 4)
+            Rectangle().fill(Color.clear)
+            Rectangle().fill(Color.gray.opacity(0.14)).frame(height: visibleDividerThickness)
+            Capsule().fill(Color.gray.opacity(0.55)).frame(width: 34, height: 4)
         }
         .contentShape(Rectangle())
     }
 
+    // MARK: - Helpers
+
     private func dismissKeyboard() {
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
-            to: nil,
-            from: nil,
-            for: nil
+            to: nil, from: nil, for: nil
         )
     }
 
