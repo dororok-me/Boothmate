@@ -11,42 +11,31 @@ struct FileViewerView: View {
     @State private var pickerDelegate: DocumentPickerDelegate?
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button(action: { pickFile() }) {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.title3)
-                        .foregroundColor(.gray)
+            ZStack {
+                if let url = selectedURL {
+                    QuickLookPreview(url: url)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    Color(UIColor.systemBackground)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding(6)
-
-                Spacer()
 
                 if isDownloading {
                     ProgressView()
                         .scaleEffect(0.8)
-                        .padding(.trailing, 6)
                 }
             }
-
-            if let url = selectedURL {
-                QuickLookPreview(url: url)
-            } else {
-                VStack {
-                    Spacer()
-                    Text("파일을 선택하세요")
-                        .foregroundColor(.gray)
-                    Spacer()
-                }
+            .clipped()
+            .alert("파일 열기 실패", isPresented: $showAlert) {
+                Button("확인", role: .cancel) {}
+            } message: {
+                Text(alertMessage)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openFilePicker)) { _ in
+                pickFile()
             }
         }
-        .alert("파일 열기 실패", isPresented: $showAlert) {
-            Button("확인", role: .cancel) {}
-        } message: {
-            Text(alertMessage)
-        }
-    }
-
+    
     private func pickFile() {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item])
         picker.allowsMultipleSelection = false
@@ -149,13 +138,17 @@ struct FileViewerView: View {
 struct QuickLookPreview: UIViewControllerRepresentable {
     let url: URL
 
-    func makeUIViewController(context: Context) -> QLPreviewController {
+    func makeUIViewController(context: Context) -> UINavigationController {
         let controller = QLPreviewController()
         controller.dataSource = context.coordinator
-        return controller
+        let nav = UINavigationController(rootViewController: controller)
+        nav.setNavigationBarHidden(true, animated: false)
+        return nav
     }
 
-    func updateUIViewController(_ controller: QLPreviewController, context: Context) {}
+    func updateUIViewController(_ nav: UINavigationController, context: Context) {
+        nav.setNavigationBarHidden(true, animated: false)
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(url: url)

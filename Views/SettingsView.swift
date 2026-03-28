@@ -5,6 +5,8 @@ struct SettingsView: View {
     @ObservedObject var speechManager: SpeechManager
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showGlossaryList = false
+
     var body: some View {
         NavigationView {
             Form {
@@ -21,6 +23,11 @@ struct SettingsView: View {
                     Button("Done") {
                         dismiss()
                     }
+                }
+            }
+            .sheet(isPresented: $showGlossaryList) {
+                if let store = speechManager.glossaryStore {
+                    GlossaryView(glossaryStore: store)
                 }
             }
         }
@@ -91,6 +98,15 @@ struct SettingsView: View {
         Section("Glossary") {
             Toggle("글로서리 적용", isOn: $speechManager.glossaryEnabled)
 
+            Button {
+                showGlossaryList = true
+            } label: {
+                HStack {
+                    Image(systemName: "text.book.closed")
+                    Text("글로서리 편집")
+                }
+            }
+
             if speechManager.glossaryEnabled {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("괄호 안 단어 색상")
@@ -158,7 +174,6 @@ struct SettingsView: View {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let rootVC = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
 
-        // sheet 위에서 띄우기
         var topVC = rootVC
         while let presented = topVC.presentedViewController {
             topVC = presented
@@ -176,6 +191,8 @@ struct SettingsView: View {
         switch code {
         case "en-US": return "English"
         case "ko-KR": return "한국어"
+        case "ja-JP": return "日本語"
+        case "zh-CN": return "中文"
         default: return code
         }
     }

@@ -10,7 +10,8 @@ struct ContentView: View {
     @State private var rightVerticalSplit: CGFloat = 0.50
 
     @State private var showSettings = false
-    @State private var showGlossary = false
+    @State private var floatingBarOffset: CGSize = .zero
+    @State private var floatingBarDragOffset: CGSize = .zero
 
     @State private var horizontalSplitDragStart: CGFloat?
     @State private var leftVerticalSplitDragStart: CGFloat?
@@ -24,7 +25,8 @@ struct ContentView: View {
     private let topBarHeight: CGFloat = 50
 
     var body: some View {
-        GeometryReader { geo in
+            ZStack {
+            GeometryReader { geo in
             let totalWidth = geo.size.width
             let totalHeight = geo.size.height
             let safeTop = geo.safeAreaInsets.top
@@ -60,9 +62,9 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 // MARK: - 왼쪽: 자막 + 메모
                 VStack(spacing: 0) {
-                    topBar(leftDangerInset: leftDangerInset)
-                        .frame(height: topBarHeight)
-                        .padding(.top, topSafeSpacing)
+                    Color.clear
+                    .frame(height: topBarHeight)
+                    .padding(.top, topSafeSpacing)
 
                     subtitleArea(leftDangerInset: leftDangerInset)
                         .frame(width: leftWidth, height: leftTopHeight)
@@ -79,10 +81,9 @@ struct ContentView: View {
                                     }
                                     guard let start = leftVerticalSplitDragStart else { return }
                                     let delta = value.translation.height / leftContentHeight
-                                    let newSplit = start + delta
                                     withTransaction(Transaction(animation: nil)) {
                                         leftVerticalSplit = clamp(
-                                            value: newSplit,
+                                            value: start + delta,
                                             minValue: minPaneHeight / leftContentHeight,
                                             maxValue: 1 - (minPaneHeight / leftContentHeight)
                                         )
@@ -110,10 +111,9 @@ struct ContentView: View {
                                 }
                                 guard let start = horizontalSplitDragStart else { return }
                                 let delta = value.translation.width / (totalWidth - dividerHitThickness)
-                                let newSplit = start + delta
                                 withTransaction(Transaction(animation: nil)) {
                                     horizontalSplit = clamp(
-                                        value: newSplit,
+                                        value: start + delta,
                                         minValue: minPaneWidth / (totalWidth - dividerHitThickness),
                                         maxValue: 1 - (minPaneWidth / (totalWidth - dividerHitThickness))
                                     )
@@ -141,10 +141,9 @@ struct ContentView: View {
                                     }
                                     guard let start = rightVerticalSplitDragStart else { return }
                                     let delta = value.translation.height / rightContentHeight
-                                    let newSplit = start + delta
                                     withTransaction(Transaction(animation: nil)) {
                                         rightVerticalSplit = clamp(
-                                            value: newSplit,
+                                            value: start + delta,
                                             minValue: minPaneHeight / rightContentHeight,
                                             maxValue: 1 - (minPaneHeight / rightContentHeight)
                                         )
@@ -163,91 +162,108 @@ struct ContentView: View {
             .frame(width: totalWidth, height: totalHeight)
         }
         .ignoresSafeArea()
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    dismissKeyboard()
+                }
+            }
+        }
         .onAppear {
             speechManager.requestPermissions()
             speechManager.glossaryStore = glossaryStore
         }
-        .sheet(isPresented: $showGlossary) {
-            GlossaryView(glossaryStore: glossaryStore)
-        }
         .sheet(isPresented: $showSettings) {
-            SettingsView(speechManager: speechManager)
+                    SettingsView(speechManager: speechManager)
+                }
+
+                // 플로팅 메뉴바
+                floatingMenuBar
+                }
+            }
+
+    // MARK: - Floating Menu Bar
+
+        private var floatingMenuBar: some View {
+            let totalOffset = CGSize(
+                width: floatingBarOffset.width + floatingBarDragOffset.width,
+                height: floatingBarOffset.height + floatingBarDragOffset.height
+            )
+
+            return HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.gray)
+                                .frame(width: 28, height: 32)
+                                .padding(.leading, 2)
+
+                toolbarIconButton(systemName: "gearshape") {
+                    showSettings = true
+                }
+
+                languageToggle
+
+                recordButton
+
+                Button(action: {
+                    pickFileFromFloating()
+                }) {
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.leading, 6)
+            .padding(.trailing, 12)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .offset(x: totalOffset.width, y: totalOffset.height)
+            .simultaneousGesture(
+                DragGesture(coordinateSpace: .global)
+                    .onChanged { value in
+                        floatingBarDragOffset = CGSize(
+                            width: value.translation.width,
+                            height: value.translation.height
+                        )
+                    }
+                    .onEnded { value in
+                        floatingBarOffset = CGSize(
+                            width: floatingBarOffset.width + value.translation.width,
+                            height: floatingBarOffset.height + value.translation.height
+                        )
+                        floatingBarDragOffset = .zero
+                    }
+            )
         }
-    }
-
-    // MARK: - Top Bar
-
-    private func topBar(leftDangerInset: CGFloat) -> some View {
-        HStack(spacing: 8) {
-            Spacer()
-
-            toolbarIconButton(systemName: "text.book.closed") {
-                showGlossary = true
-            }
-
-            toolbarIconButton(systemName: "arrow.counterclockwise") {
-                speechManager.clearSubtitles()
-            }
-
-            toolbarIconButton(systemName: "gearshape") {
-                showSettings = true
-            }
-
-            fontSizeButton
-
-            toolbarIconButton(systemName: "keyboard.chevron.compact.down") {
-                dismissKeyboard()
-            }
-
-            languageToggle
-
-            recordButton
-        }
-        .padding(.leading, 10 + leftDangerInset)
-        .padding(.trailing, 10)
-        .background(Color.clear)
-    }
-
+    
     // MARK: - Language Toggle
 
     private var languageToggle: some View {
-            HStack(spacing: 0) {
-                ForEach(speechManager.languages, id: \.1) { name, code in
-                    Button {
-                        speechManager.selectedLanguage = code
-                    } label: {
-                        Text(name)
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(width: 32, height: 28)
-                            .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
-                            .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
-                    }
+        HStack(spacing: 0) {
+            ForEach(speechManager.languages, id: \.1) { name, code in
+                Button {
+                    speechManager.selectedLanguage = code
+                } label: {
+                    Text(name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 32, height: 28)
+                        .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
+                        .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
                 }
             }
-            .background(Color.gray.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-
-    // MARK: - Font Size Button
-
-    private var fontSizeButton: some View {
-        Button {
-            speechManager.cycleFontSize()
-        } label: {
-            HStack(spacing: 0) {
-                Text("A").font(.system(size: 13, weight: .medium))
-                Text("A").font(.system(size: 20, weight: .bold))
-            }
-            .foregroundColor(.primary)
-            .frame(width: 38, height: 32)
-        }
-        .buttonStyle(.plain)
+        .background(Color.gray.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: - Record Button
 
     private var recordButton: some View {
-        HStack(spacing: 4) {
             Button {
                 if speechManager.isRecording {
                     speechManager.stopRecording()
@@ -258,25 +274,26 @@ struct ContentView: View {
                 ZStack {
                     Circle()
                         .fill(speechManager.isRecording ? Color.red : Color.green)
-                        .frame(width: 32, height: 32)
-                    Image(systemName: speechManager.isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
+                        .frame(width: 36, height: 36)
+
+                    if speechManager.isRecording {
+                                        VStack(spacing: 0) {
+                                            Text(String(format: "%02d:", speechManager.elapsedSeconds / 60))
+                                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                                .foregroundColor(.white)
+                                            Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
+                                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                                .foregroundColor(.white)
+                                        }
+                    } else {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                 }
             }
             .buttonStyle(.plain)
-
-            VStack(spacing: 0) {
-                Text(String(format: "%02d", speechManager.elapsedSeconds / 60))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(speechManager.isRecording ? .red : .secondary)
-                Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(speechManager.isRecording ? .red : .secondary)
-            }
-            .frame(width: 20)
         }
-    }
 
     // MARK: - Toolbar Icon Button
 
@@ -335,9 +352,7 @@ struct ContentView: View {
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         DispatchQueue.main.async {
-            withAnimation(.easeOut(duration: 0.15)) {
-                proxy.scrollTo("bottomAnchor", anchor: .bottom)
-            }
+            proxy.scrollTo("bottomAnchor", anchor: .bottom)
         }
     }
 
@@ -353,9 +368,8 @@ struct ContentView: View {
                 : speechManager.selectedTheme.textColor.opacity(opacity)
         ) { word in
             NotificationCenter.default.post(
-                name: Notification.Name.searchDictionary,
-                object: word,
-                userInfo: nil
+                name: .searchDictionary,
+                object: word
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -385,6 +399,10 @@ struct ContentView: View {
 
     // MARK: - Helpers
 
+    private func pickFileFromFloating() {
+            NotificationCenter.default.post(name: .openFilePicker, object: nil)
+        }
+    
     private func dismissKeyboard() {
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
