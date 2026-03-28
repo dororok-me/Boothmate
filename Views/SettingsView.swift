@@ -10,12 +10,14 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                languageSection
-                fontSection
-                themeSection
-                glossarySection
-                exportSection
-            }
+                            languageSection
+                            fontSection
+                            themeSection
+                            glossarySection
+                            exportSection
+                            aboutSection
+                        }
+            
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -170,6 +172,21 @@ struct SettingsView: View {
         }
     }
 
+    private var aboutSection: some View {
+            Section {
+                VStack(spacing: 4) {
+                    Text("Boothmate v1.0")
+                        .font(.footnote.bold())
+                        .foregroundColor(.secondary)
+                    Text("dororok studio")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
+        }
+    
     private func shareSubtitles() {
         let text = speechManager.exportAllSubtitles()
         guard !text.isEmpty else { return }

@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showGlossary = false
     @State private var menuExpanded = false
+    @State private var isDraggingBar = false
 
     @State private var floatingBarOffset: CGSize = .zero
     @State private var floatingBarDragOffset: CGSize = .zero
@@ -203,7 +204,17 @@ struct ContentView: View {
                 .frame(width: 28, height: 32)
                 .padding(.leading, 2)
 
-            recordButton
+                            Group {
+                            VStack(spacing: 0) {
+                                Text("Boothmate")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.gray)
+                                Text("v1.0")
+                                    .font(.system(size: 7, weight: .medium))
+                                    .foregroundColor(.gray.opacity(0.6))
+                            }
+
+                            recordButton
 
             Button {
                             if speechManager.isPaused {
@@ -285,9 +296,12 @@ struct ContentView: View {
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)
-            }
-        }
-        .padding(.leading, 6)
+                            }
+                            }
+                            .allowsHitTesting(!isDraggingBar)
+                            .opacity(isDraggingBar ? 0.4 : 1.0)
+                        }
+                        .padding(.leading, 6)
         .padding(.trailing, 12)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
@@ -297,22 +311,26 @@ struct ContentView: View {
         .transaction { t in
             t.animation = nil
         }
-        .simultaneousGesture(
-            DragGesture(coordinateSpace: .global)
-                .onChanged { value in
-                    floatingBarDragOffset = CGSize(
-                        width: value.translation.width,
-                        height: value.translation.height
-                    )
-                }
-                .onEnded { value in
-                    floatingBarOffset = CGSize(
-                        width: floatingBarOffset.width + value.translation.width,
-                        height: floatingBarOffset.height + value.translation.height
-                    )
-                    floatingBarDragOffset = .zero
-                }
-        )
+        .highPriorityGesture(
+                    DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                        .onChanged { value in
+                            isDraggingBar = true
+                            floatingBarDragOffset = CGSize(
+                                width: value.translation.width,
+                                height: value.translation.height
+                            )
+                        }
+                        .onEnded { value in
+                            floatingBarOffset = CGSize(
+                                width: floatingBarOffset.width + value.translation.width,
+                                height: floatingBarOffset.height + value.translation.height
+                            )
+                            floatingBarDragOffset = .zero
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                isDraggingBar = false
+                            }
+                        }
+                )
     }
 
     // MARK: - Language Toggle
