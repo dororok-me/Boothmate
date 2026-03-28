@@ -20,6 +20,14 @@ struct FileViewerView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
+                // 중앙 폴더 아이콘 (항상 표시, 파일 위에 플로팅)
+                Button(action: { pickFile() }) {
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 30))
+                        .foregroundColor(.gray.opacity(0.3))
+                }
+                .buttonStyle(.plain)
+
                 if isDownloading {
                     ProgressView()
                         .scaleEffect(0.8)

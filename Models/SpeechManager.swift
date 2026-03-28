@@ -14,6 +14,7 @@ class SpeechManager: ObservableObject {
         @Published var fontSize: CGFloat = 22
         @Published var selectedTheme: SubtitleTheme = .normal
         @Published var elapsedSeconds: Int = 0
+        @Published var isPaused: Bool = false
         @Published var glossaryEnabled: Bool = true
         @Published var glossaryColor: GlossaryColor = .orange
 
@@ -163,6 +164,27 @@ class SpeechManager: ObservableObject {
         currentText = ""
     }
 
+    func pauseRecording() {
+            guard isRecording, !isPaused else { return }
+            audioEngine.pause()
+            isPaused = true
+            timer?.invalidate()
+            timer = nil
+        }
+
+        func resumeRecording() {
+            guard isRecording, isPaused else { return }
+            try? audioEngine.start()
+            isPaused = false
+            let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.elapsedSeconds += 1
+                }
+            }
+            RunLoop.main.add(newTimer, forMode: .common)
+            timer = newTimer
+        }
+    
     private func restartRecording() {
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)

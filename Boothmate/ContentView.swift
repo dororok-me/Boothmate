@@ -10,6 +10,9 @@ struct ContentView: View {
     @State private var rightVerticalSplit: CGFloat = 0.50
 
     @State private var showSettings = false
+    @State private var showGlossary = false
+    @State private var menuExpanded = false
+
     @State private var floatingBarOffset: CGSize = .zero
     @State private var floatingBarDragOffset: CGSize = .zero
 
@@ -19,228 +22,299 @@ struct ContentView: View {
 
     private let dividerHitThickness: CGFloat = 28
     private let visibleDividerThickness: CGFloat = 1
-
     private let minPaneWidth: CGFloat = 90
     private let minPaneHeight: CGFloat = 28
     private let topBarHeight: CGFloat = 50
 
     var body: some View {
-            ZStack {
+        ZStack {
             GeometryReader { geo in
-            let totalWidth = geo.size.width
-            let totalHeight = geo.size.height
-            let safeTop = geo.safeAreaInsets.top
-            let safeLeading = geo.safeAreaInsets.leading
-            let isLandscape = totalWidth > totalHeight
-            let leftDangerInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
-            let topSafeSpacing = safeTop + 8
+                let totalWidth = geo.size.width
+                let totalHeight = geo.size.height
+                let safeTop = geo.safeAreaInsets.top
+                let safeLeading = geo.safeAreaInsets.leading
+                let isLandscape = totalWidth > totalHeight
+                let leftDangerInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
+                let topSafeSpacing = safeTop + 8
 
-            let leftWidth = clamp(
-                value: (totalWidth - dividerHitThickness) * horizontalSplit,
-                minValue: minPaneWidth,
-                maxValue: totalWidth - dividerHitThickness - minPaneWidth
-            )
-            let rightWidth = totalWidth - leftWidth - dividerHitThickness
+                let leftWidth = clamp(
+                    value: (totalWidth - dividerHitThickness) * horizontalSplit,
+                    minValue: minPaneWidth,
+                    maxValue: totalWidth - dividerHitThickness - minPaneWidth
+                )
+                let rightWidth = totalWidth - leftWidth - dividerHitThickness
 
-            let leftContentHeight = totalHeight - topSafeSpacing - topBarHeight - dividerHitThickness
-            let rightContentHeight = totalHeight - dividerHitThickness
+                let leftContentHeight = totalHeight - topSafeSpacing - topBarHeight - dividerHitThickness
+                let rightContentHeight = totalHeight - dividerHitThickness
 
-            let leftTopHeight = clamp(
-                value: leftContentHeight * leftVerticalSplit,
-                minValue: minPaneHeight,
-                maxValue: leftContentHeight - minPaneHeight
-            )
-            let leftBottomHeight = leftContentHeight - leftTopHeight
+                let leftTopHeight = clamp(
+                    value: leftContentHeight * leftVerticalSplit,
+                    minValue: minPaneHeight,
+                    maxValue: leftContentHeight - minPaneHeight
+                )
+                let leftBottomHeight = leftContentHeight - leftTopHeight
 
-            let rightTopHeight = clamp(
-                value: rightContentHeight * rightVerticalSplit,
-                minValue: minPaneHeight,
-                maxValue: rightContentHeight - minPaneHeight
-            )
-            let rightBottomHeight = rightContentHeight - rightTopHeight
+                let rightTopHeight = clamp(
+                    value: rightContentHeight * rightVerticalSplit,
+                    minValue: minPaneHeight,
+                    maxValue: rightContentHeight - minPaneHeight
+                )
+                let rightBottomHeight = rightContentHeight - rightTopHeight
 
-            HStack(spacing: 0) {
-                // MARK: - 왼쪽: 자막 + 메모
-                VStack(spacing: 0) {
-                    Color.clear
-                    .frame(height: topBarHeight)
-                    .padding(.top, topSafeSpacing)
+                HStack(spacing: 0) {
+                    // MARK: - 왼쪽: 자막 + 메모
+                    VStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: topBarHeight)
+                            .padding(.top, topSafeSpacing)
 
-                    subtitleArea(leftDangerInset: leftDangerInset)
-                        .frame(width: leftWidth, height: leftTopHeight)
-                        .background(speechManager.selectedTheme.backgroundColor)
+                        subtitleArea(leftDangerInset: leftDangerInset)
+                            .frame(width: leftWidth, height: leftTopHeight)
+                            .background(speechManager.selectedTheme.backgroundColor)
 
-                    horizontalDragHandle
-                        .frame(width: leftWidth, height: dividerHitThickness)
+                        horizontalDragHandle
+                            .frame(width: leftWidth, height: dividerHitThickness)
+                            .contentShape(Rectangle())
+                            .highPriorityGesture(
+                                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                                    .onChanged { value in
+                                        if leftVerticalSplitDragStart == nil {
+                                            leftVerticalSplitDragStart = leftVerticalSplit
+                                        }
+                                        guard let start = leftVerticalSplitDragStart else { return }
+                                        let delta = value.translation.height / leftContentHeight
+                                        withTransaction(Transaction(animation: nil)) {
+                                            leftVerticalSplit = clamp(
+                                                value: start + delta,
+                                                minValue: minPaneHeight / leftContentHeight,
+                                                maxValue: 1 - (minPaneHeight / leftContentHeight)
+                                            )
+                                        }
+                                    }
+                                    .onEnded { _ in
+                                        leftVerticalSplitDragStart = nil
+                                    }
+                            )
+
+                        MemoView()
+                            .frame(width: leftWidth, height: leftBottomHeight)
+                            .background(Color(.systemBackground))
+                    }
+
+                    // MARK: - 좌우 드래그 핸들
+                    verticalDragHandle
+                        .frame(width: dividerHitThickness, height: totalHeight)
                         .contentShape(Rectangle())
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 0, coordinateSpace: .global)
                                 .onChanged { value in
-                                    if leftVerticalSplitDragStart == nil {
-                                        leftVerticalSplitDragStart = leftVerticalSplit
+                                    if horizontalSplitDragStart == nil {
+                                        horizontalSplitDragStart = horizontalSplit
                                     }
-                                    guard let start = leftVerticalSplitDragStart else { return }
-                                    let delta = value.translation.height / leftContentHeight
+                                    guard let start = horizontalSplitDragStart else { return }
+                                    let delta = value.translation.width / (totalWidth - dividerHitThickness)
                                     withTransaction(Transaction(animation: nil)) {
-                                        leftVerticalSplit = clamp(
+                                        horizontalSplit = clamp(
                                             value: start + delta,
-                                            minValue: minPaneHeight / leftContentHeight,
-                                            maxValue: 1 - (minPaneHeight / leftContentHeight)
+                                            minValue: minPaneWidth / (totalWidth - dividerHitThickness),
+                                            maxValue: 1 - (minPaneWidth / (totalWidth - dividerHitThickness))
                                         )
                                     }
                                 }
                                 .onEnded { _ in
-                                    leftVerticalSplitDragStart = nil
+                                    horizontalSplitDragStart = nil
                                 }
                         )
 
-                    MemoView()
-                        .frame(width: leftWidth, height: leftBottomHeight)
-                        .background(Color(.systemBackground))
-                }
+                    // MARK: - 오른쪽: 파일뷰어 + 사전
+                    VStack(spacing: 0) {
+                        FileViewerView()
+                            .frame(width: rightWidth, height: rightTopHeight)
+                            .background(Color(.systemBackground))
 
-                // MARK: - 좌우 드래그 핸들
-                verticalDragHandle
-                    .frame(width: dividerHitThickness, height: totalHeight)
-                    .contentShape(Rectangle())
-                    .highPriorityGesture(
-                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                            .onChanged { value in
-                                if horizontalSplitDragStart == nil {
-                                    horizontalSplitDragStart = horizontalSplit
-                                }
-                                guard let start = horizontalSplitDragStart else { return }
-                                let delta = value.translation.width / (totalWidth - dividerHitThickness)
-                                withTransaction(Transaction(animation: nil)) {
-                                    horizontalSplit = clamp(
-                                        value: start + delta,
-                                        minValue: minPaneWidth / (totalWidth - dividerHitThickness),
-                                        maxValue: 1 - (minPaneWidth / (totalWidth - dividerHitThickness))
-                                    )
-                                }
-                            }
-                            .onEnded { _ in
-                                horizontalSplitDragStart = nil
-                            }
-                    )
-
-                // MARK: - 오른쪽: 파일뷰어 + 사전
-                VStack(spacing: 0) {
-                    FileViewerView()
-                        .frame(width: rightWidth, height: rightTopHeight)
-                        .background(Color(.systemBackground))
-
-                    horizontalDragHandle
-                        .frame(width: rightWidth, height: dividerHitThickness)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                                .onChanged { value in
-                                    if rightVerticalSplitDragStart == nil {
-                                        rightVerticalSplitDragStart = rightVerticalSplit
+                        horizontalDragHandle
+                            .frame(width: rightWidth, height: dividerHitThickness)
+                            .contentShape(Rectangle())
+                            .highPriorityGesture(
+                                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                                    .onChanged { value in
+                                        if rightVerticalSplitDragStart == nil {
+                                            rightVerticalSplitDragStart = rightVerticalSplit
+                                        }
+                                        guard let start = rightVerticalSplitDragStart else { return }
+                                        let delta = value.translation.height / rightContentHeight
+                                        withTransaction(Transaction(animation: nil)) {
+                                            rightVerticalSplit = clamp(
+                                                value: start + delta,
+                                                minValue: minPaneHeight / rightContentHeight,
+                                                maxValue: 1 - (minPaneHeight / rightContentHeight)
+                                            )
+                                        }
                                     }
-                                    guard let start = rightVerticalSplitDragStart else { return }
-                                    let delta = value.translation.height / rightContentHeight
-                                    withTransaction(Transaction(animation: nil)) {
-                                        rightVerticalSplit = clamp(
-                                            value: start + delta,
-                                            minValue: minPaneHeight / rightContentHeight,
-                                            maxValue: 1 - (minPaneHeight / rightContentHeight)
-                                        )
+                                    .onEnded { _ in
+                                        rightVerticalSplitDragStart = nil
                                     }
-                                }
-                                .onEnded { _ in
-                                    rightVerticalSplitDragStart = nil
-                                }
-                        )
+                            )
 
-                    DictionaryView()
-                        .frame(width: rightWidth, height: rightBottomHeight)
-                        .background(Color(.systemBackground))
+                        DictionaryView()
+                            .frame(width: rightWidth, height: rightBottomHeight)
+                            .background(Color(.systemBackground))
+                    }
+                }
+                .frame(width: totalWidth, height: totalHeight)
+            }
+            .ignoresSafeArea()
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        dismissKeyboard()
+                    }
                 }
             }
-            .frame(width: totalWidth, height: totalHeight)
-        }
-        .ignoresSafeArea()
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    dismissKeyboard()
-                }
+            .onAppear {
+                speechManager.requestPermissions()
+                speechManager.glossaryStore = glossaryStore
             }
-        }
-        .onAppear {
-            speechManager.requestPermissions()
-            speechManager.glossaryStore = glossaryStore
-        }
-        .sheet(isPresented: $showSettings) {
-                    SettingsView(speechManager: speechManager)
-                }
+            .sheet(isPresented: $showSettings) {
+                SettingsView(speechManager: speechManager)
+            }
+            .sheet(isPresented: $showGlossary) {
+                GlossaryView(glossaryStore: glossaryStore)
+            }
 
-                // 플로팅 메뉴바
-                floatingMenuBar
-                }
-            }
+            // MARK: - 플로팅 메뉴바
+            floatingMenuBar
+        }
+    }
 
     // MARK: - Floating Menu Bar
 
-        private var floatingMenuBar: some View {
-            let totalOffset = CGSize(
-                width: floatingBarOffset.width + floatingBarDragOffset.width,
-                height: floatingBarOffset.height + floatingBarDragOffset.height
-            )
+    private var floatingMenuBar: some View {
+        let totalOffset = CGSize(
+            width: floatingBarOffset.width + floatingBarDragOffset.width,
+            height: floatingBarOffset.height + floatingBarDragOffset.height
+        )
 
-            return HStack(spacing: 8) {
-                Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.gray)
-                                .frame(width: 28, height: 32)
-                                .padding(.leading, 2)
+        return HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.gray)
+                .frame(width: 28, height: 32)
+                .padding(.leading, 2)
 
-                toolbarIconButton(systemName: "gearshape") {
-                    showSettings = true
+            recordButton
+
+            Button {
+                            if speechManager.isPaused {
+                                speechManager.resumeRecording()
+                            } else {
+                                speechManager.pauseRecording()
+                            }
+                        } label: {
+                            Image(systemName: speechManager.isPaused ? "play.fill" : "pause.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(speechManager.isPaused ? .orange : .primary)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(speechManager.isRecording ? 1 : 0.3)
+                        .disabled(!speechManager.isRecording)
+
+            languageToggle
+
+            Button(action: { pickFileFromFloating() }) {
+                Image(systemName: "folder.badge.plus")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    menuExpanded.toggle()
                 }
+            } label: {
+                Image(systemName: menuExpanded ? "chevron.left" : "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.gray)
+                    .frame(width: 24, height: 32)
+            }
+            .buttonStyle(.plain)
 
-                languageToggle
+            if menuExpanded {
+                Button {
+                    speechManager.clearSubtitles()
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
 
-                recordButton
+                Button {
+                    showGlossary = true
+                } label: {
+                    Image(systemName: "text.book.closed")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
 
-                Button(action: {
-                    pickFileFromFloating()
-                }) {
-                    Image(systemName: "folder.badge.plus")
+                Button {
+                    speechManager.cycleFontSize()
+                } label: {
+                    HStack(spacing: 0) {
+                        Text("A").font(.system(size: 13, weight: .medium))
+                        Text("A").font(.system(size: 20, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                    .frame(width: 38, height: 32)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.primary)
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.leading, 6)
-            .padding(.trailing, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-            .offset(x: totalOffset.width, y: totalOffset.height)
-            .simultaneousGesture(
-                DragGesture(coordinateSpace: .global)
-                    .onChanged { value in
-                        floatingBarDragOffset = CGSize(
-                            width: value.translation.width,
-                            height: value.translation.height
-                        )
-                    }
-                    .onEnded { value in
-                        floatingBarOffset = CGSize(
-                            width: floatingBarOffset.width + value.translation.width,
-                            height: floatingBarOffset.height + value.translation.height
-                        )
-                        floatingBarDragOffset = .zero
-                    }
-            )
         }
-    
+        .padding(.leading, 6)
+        .padding(.trailing, 12)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .offset(x: totalOffset.width, y: totalOffset.height)
+        .transaction { t in
+            t.animation = nil
+        }
+        .simultaneousGesture(
+            DragGesture(coordinateSpace: .global)
+                .onChanged { value in
+                    floatingBarDragOffset = CGSize(
+                        width: value.translation.width,
+                        height: value.translation.height
+                    )
+                }
+                .onEnded { value in
+                    floatingBarOffset = CGSize(
+                        width: floatingBarOffset.width + value.translation.width,
+                        height: floatingBarOffset.height + value.translation.height
+                    )
+                    floatingBarDragOffset = .zero
+                }
+        )
+    }
+
     // MARK: - Language Toggle
 
     private var languageToggle: some View {
@@ -264,45 +338,33 @@ struct ContentView: View {
     // MARK: - Record Button
 
     private var recordButton: some View {
-            Button {
-                if speechManager.isRecording {
-                    speechManager.stopRecording()
-                } else {
-                    speechManager.startRecording()
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(speechManager.isRecording ? Color.red : Color.green)
-                        .frame(width: 36, height: 36)
+        Button {
+            if speechManager.isRecording {
+                speechManager.stopRecording()
+            } else {
+                speechManager.startRecording()
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(speechManager.isRecording ? Color.red : Color.green)
+                    .frame(width: 36, height: 36)
 
-                    if speechManager.isRecording {
-                                        VStack(spacing: 0) {
-                                            Text(String(format: "%02d:", speechManager.elapsedSeconds / 60))
-                                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                                .foregroundColor(.white)
-                                            Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
-                                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                                .foregroundColor(.white)
-                                        }
-                    } else {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 14, weight: .bold))
+                if speechManager.isRecording {
+                    VStack(spacing: 0) {
+                        Text(String(format: "%02d:", speechManager.elapsedSeconds / 60))
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                        Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundColor(.white)
                     }
+                } else {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
                 }
             }
-            .buttonStyle(.plain)
-        }
-
-    // MARK: - Toolbar Icon Button
-
-    private func toolbarIconButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.primary)
-                .frame(width: 32, height: 32)
         }
         .buttonStyle(.plain)
     }
@@ -400,9 +462,9 @@ struct ContentView: View {
     // MARK: - Helpers
 
     private func pickFileFromFloating() {
-            NotificationCenter.default.post(name: .openFilePicker, object: nil)
-        }
-    
+        NotificationCenter.default.post(name: .openFilePicker, object: nil)
+    }
+
     private func dismissKeyboard() {
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
