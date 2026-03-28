@@ -53,14 +53,17 @@ struct DaumDictionaryWebView: UIViewRepresentable {
                     document.body.style.webkitTextSizeAdjust = '70%';
 
                     var style = document.createElement('style');
-                    style.textContent = `
-                        .txt_cleansch { font-size: 22px !important; }
-                        .tit_cleansch { font-size: 22px !important; }
-                        .txt_emph1 { font-size: 22px !important; }
-                        .search_word .txt_search { font-size: 22px !important; }
-                        .cleansch_top .txt_emph1 { font-size: 22px !important; }
-                        .search_box .txt_search { font-size: 14px !important; }
-                    `;
+                                style.textContent = `
+                                    .txt_cleansch { font-size: 22px !important; }
+                                    .tit_cleansch { font-size: 22px !important; }
+                                    .txt_emph1 { font-size: 22px !important; }
+                                    .search_word .txt_search { font-size: 22px !important; }
+                                    .cleansch_top .txt_emph1 { font-size: 22px !important; }
+                                    .search_box .txt_search { font-size: 14px !important; }
+                                    #searchBar, .search_bar, .wrap_searchbar, .search_top, .card_word .search_box, .clean_search_wrap, .search_cleansch { display: none !important; }
+                                    .header_search, .wrap_topsearch, #header, .gnb_comm { display: none !important; }
+                                                    .card_word .search_box, .box_searchbar, .wrap_select, .select_dic { display: none !important; }
+                                `;
                     document.head.appendChild(style);
                     """,
                     injectionTime: .atDocumentEnd,
