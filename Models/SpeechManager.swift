@@ -91,12 +91,18 @@ class SpeechManager: ObservableObject {
             }
 
             audioEngine.prepare()
-            try audioEngine.start()
-            isRecording = false
-
-                    // 타이머 중지
-                    timer?.invalidate()
-                    timer = nil
+                        try audioEngine.start()
+                        isRecording = true
+            // 타이머 시작
+            // 타이머 시작
+                        elapsedSeconds = 0
+                        let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+                            Task { @MainActor in
+                                self?.elapsedSeconds += 1
+                            }
+                        }
+                        RunLoop.main.add(newTimer, forMode: .common)
+                        timer = newTimer
 
             recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 Task { @MainActor in
@@ -139,6 +145,8 @@ class SpeechManager: ObservableObject {
         recognitionRequest = nil
         recognitionTask = nil
         isRecording = false
+        timer?.invalidate()
+                timer = nil
 
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
