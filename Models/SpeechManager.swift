@@ -157,30 +157,50 @@ class SpeechManager: ObservableObject {
     }
 
     private func applyGlossary(to text: String) -> String {
-        guard let glossaryStore = glossaryStore else { return text }
+            guard let glossaryStore = glossaryStore else { return text }
+            guard !glossaryStore.entries.isEmpty else { return text }
 
-        var output = text
+            // 단어 단위로 분리
+            let words = text.components(separatedBy: " ")
+            var result: [String] = []
 
-        for entry in glossaryStore.entries {
-            let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
-            let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
+            for word in words {
+                // 구두점 분리 (앞뒤)
+                let leading = String(word.prefix(while: { $0.isPunctuation || $0.isWhitespace }))
+                let trailing = String(word.reversed().prefix(while: { $0.isPunctuation || $0.isWhitespace }).reversed())
+                let startIndex = word.index(word.startIndex, offsetBy: leading.count)
+                let endIndex = word.index(word.endIndex, offsetBy: -trailing.count)
+                let clean = startIndex < endIndex ? String(word[startIndex..<endIndex]) : word
 
-            guard !source.isEmpty else { continue }
+                var matched = false
 
-            if output.localizedCaseInsensitiveContains(source) {
-                output = output.replacingOccurrences(
-                    of: source,
-                    with: target,
-                    options: .caseInsensitive
-                )
+                for entry in glossaryStore.entries {
+                    let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !source.isEmpty, !target.isEmpty else { continue }
+
+                    if clean.localizedCaseInsensitiveCompare(source) == .orderedSame {
+                        result.append("\(leading)\(clean)(\(target))\(trailing)")
+                        matched = true
+                        break
+                    }
+                    else if clean.localizedCaseInsensitiveCompare(target) == .orderedSame {
+                        result.append("\(leading)\(clean)(\(source))\(trailing)")
+                        matched = true
+                        break
+                    }
+                }
+
+                if !matched {
+                    result.append(word)
+                }
             }
+
+            return result.joined(separator: " ")
         }
-
-        return output
     }
-}
 
-enum SubtitleTheme: String, CaseIterable, Identifiable {
+    enum SubtitleTheme: String, CaseIterable, Identifiable {
     case normal = "Normal View"
     case night = "Night View"
     case legal = "Legal Pad"

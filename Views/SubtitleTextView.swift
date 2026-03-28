@@ -22,13 +22,16 @@ struct SubtitleTextView: View {
     }
 
     private func wordView(_ word: String) -> some View {
-        let cleaned = word
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: .punctuationCharacters)
+            let cleaned = word
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: .punctuationCharacters)
 
-        let isGlossary = glossaryStore.findMatch(for: cleaned) != nil
+            // 양방향: source 또는 target 모두 하이라이트
+            let isSource = glossaryStore.hasSource(cleaned)
+            let isTarget = glossaryStore.hasTarget(cleaned)
+            let isGlossary = isSource || isTarget
 
-        return Text(word)
+            return Text(word)
             .font(.system(size: fontSize, weight: .medium))
             .foregroundColor(isGlossary ? .orange : textColor)
             .padding(.horizontal, 2)

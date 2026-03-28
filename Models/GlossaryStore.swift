@@ -14,6 +14,10 @@ class GlossaryStore: ObservableObject {
 
     private let saveKey = "glossary_entries"
 
+    // 빠른 검색을 위한 캐시
+    private var sourceCache: Set<String> = []
+    private var targetCache: Set<String> = []
+
     init() {
         load()
     }
@@ -38,6 +42,7 @@ class GlossaryStore: ObservableObject {
         if let data = try? JSONEncoder().encode(entries) {
             UserDefaults.standard.set(data, forKey: saveKey)
         }
+        rebuildCache()
     }
 
     private func load() {
@@ -45,6 +50,30 @@ class GlossaryStore: ObservableObject {
            let decoded = try? JSONDecoder().decode([GlossaryEntry].self, from: data) {
             entries = decoded
         }
+        rebuildCache()
+    }
+
+    private func rebuildCache() {
+        sourceCache = Set(entries.map { $0.source.lowercased() })
+        targetCache = Set(entries.map { $0.target.lowercased() })
+    }
+
+    // source 캐시에서 빠른 검색
+    func hasSource(_ word: String) -> Bool {
+        sourceCache.contains(word.lowercased())
+    }
+
+    // target 캐시에서 빠른 검색
+    func hasTarget(_ word: String) -> Bool {
+        targetCache.contains(word.lowercased())
+    }
+
+    // 단어가 글로서리에 있는지 확인 (source 또는 target)
+    func findMatch(for word: String) -> GlossaryEntry? {
+        let lower = word.lowercased()
+        return entries.first(where: {
+            $0.source.lowercased() == lower || $0.target.lowercased() == lower
+        })
     }
 
     // CSV 가져오기
@@ -59,7 +88,6 @@ class GlossaryStore: ObservableObject {
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { continue }
-            // 첫 줄이 헤더면 건너뛰기
             if trimmed.lowercased().starts(with: "source") { continue }
 
             let cols = trimmed.components(separatedBy: ",")
@@ -67,7 +95,6 @@ class GlossaryStore: ObservableObject {
                 let source = cols[0].trimmingCharacters(in: .whitespaces)
                 let target = cols[1].trimmingCharacters(in: .whitespaces)
                 if !source.isEmpty {
-                    // 중복 방지
                     if !entries.contains(where: { $0.source == source }) {
                         entries.append(GlossaryEntry(source: source, target: target))
                     }
@@ -75,12 +102,5 @@ class GlossaryStore: ObservableObject {
             }
         }
         save()
-    }
-
-    // 단어가 글로서리에 있는지 확인
-    func findMatch(for word: String) -> GlossaryEntry? {
-        return entries.first(where: {
-            $0.source.localizedCaseInsensitiveCompare(word) == .orderedSame
-        })
     }
 }
