@@ -14,6 +14,8 @@ class SpeechManager: ObservableObject {
         @Published var fontSize: CGFloat = 22
         @Published var selectedTheme: SubtitleTheme = .normal
         @Published var elapsedSeconds: Int = 0
+        @Published var glossaryEnabled: Bool = true
+        @Published var glossaryColor: GlossaryColor = .orange
 
         weak var glossaryStore: GlossaryStore?
 
@@ -186,8 +188,8 @@ class SpeechManager: ObservableObject {
     }
 
     private func applyGlossary(to text: String) -> String {
-            guard let glossaryStore = glossaryStore else { return text }
-            guard !glossaryStore.entries.isEmpty else { return text }
+        guard glossaryEnabled else { return text }
+        guard let glossaryStore = glossaryStore else { return text }
 
             var output = text
 
@@ -270,6 +272,36 @@ class SpeechManager: ObservableObject {
             }
 
         return result.joined(separator: " ")
+            }
+        }
+
+        enum GlossaryColor: String, CaseIterable, Identifiable {
+            case orange = "Orange"
+            case blue = "Blue"
+            case green = "Green"
+            case red = "Red"
+            case purple = "Purple"
+
+            var id: String { rawValue }
+
+            var label: String {
+                switch self {
+                case .orange: return "주황"
+                case .blue: return "파랑"
+                case .green: return "초록"
+                case .red: return "빨강"
+                case .purple: return "보라"
+                }
+            }
+
+            var color: Color {
+                switch self {
+                case .orange: return .orange
+                case .blue: return .blue
+                case .green: return .green
+                case .red: return .red
+                case .purple: return .purple
+                }
             }
         }
 

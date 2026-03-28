@@ -367,12 +367,12 @@ struct ContentView: View {
     }
 
     private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
-        SubtitleTextView(
-            text: text,
-            fontSize: speechManager.fontSize,
-            textColor: speechManager.selectedTheme.textColor.opacity(opacity),
-            glossaryStore: glossaryStore
-        ) { word in
+            TappableText(
+                text: text,
+                fontSize: speechManager.fontSize,
+                textColor: speechManager.selectedTheme.textColor.opacity(opacity),
+                glossaryColor: speechManager.glossaryEnabled ? speechManager.glossaryColor.color : speechManager.selectedTheme.textColor.opacity(opacity)
+            ) { word in
             NotificationCenter.default.post(
                 name: Notification.Name.searchDictionary,
                 object: word,
