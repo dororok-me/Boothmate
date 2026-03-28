@@ -7,20 +7,27 @@ struct FileViewerView: View {
     @State private var selectedURL: URL?
     @State private var isDownloading = false
     @State private var showAlert = false
-    @State private var alertMessage = false ? "" : ""
+    @State private var alertMessage = ""
     @State private var pickerDelegate: DocumentPickerDelegate?
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                            Spacer()
-                            Button(action: { pickFile() }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(6)
-                        }
+                Button(action: { pickFile() }) {
+                    Image(systemName: "folder.badge.plus")
+                        .font(.title3)
+                        .foregroundColor(.gray)
+                }
+                .padding(6)
+
+                Spacer()
+
+                if isDownloading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .padding(.trailing, 6)
+                }
+            }
 
             if let url = selectedURL {
                 QuickLookPreview(url: url)
@@ -34,7 +41,7 @@ struct FileViewerView: View {
             }
         }
         .alert("파일 열기 실패", isPresented: $showAlert) {
-            Button("확인", role: .cancel) { }
+            Button("확인", role: .cancel) {}
         } message: {
             Text(alertMessage)
         }
@@ -66,54 +73,71 @@ struct FileViewerView: View {
             return
         }
 
-        if isUbiquitous(url) && !isDownloaded(url) {
+        let fm = FileManager.default
+
+        if fm.isUbiquitousItem(at: url) && !isFileDownloaded(url) {
             isDownloading = true
 
-            downloadFromiCloud(url) { success in
-                DispatchQueue.main.async {
-                    self.isDownloading = false
+            DispatchQueue.global().async {
+                do {
+                    try fm.startDownloadingUbiquitousItem(at: url)
 
-                    if success {
-                        self.selectedURL = url
-                    } else {
+                    for _ in 0..<120 {
+                        Thread.sleep(forTimeInterval: 0.5)
+                        if self.isFileDownloaded(url) {
+                            Thread.sleep(forTimeInterval: 0.5)
+                            DispatchQueue.main.async {
+                                self.isDownloading = false
+                                self.copyAndOpen(url)
+                            }
+                            return
+                        }
+                    }
+
+                    DispatchQueue.main.async {
+                        self.isDownloading = false
                         url.stopAccessingSecurityScopedResource()
-                        self.showError("파일을 다운로드할 수 없습니다.\nFiles 앱에서 먼저 열어주세요.")
+                        self.showError("iCloud에서 다운로드할 수 없습니다.\nFiles 앱에서 먼저 열어주세요.")
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.isDownloading = false
+                        url.stopAccessingSecurityScopedResource()
+                        self.showError("다운로드 오류: \(error.localizedDescription)")
                     }
                 }
             }
         } else {
+            copyAndOpen(url)
+        }
+    }
+
+    private func copyAndOpen(_ url: URL) {
+        let tempDir = FileManager.default.temporaryDirectory
+        let localURL = tempDir.appendingPathComponent(url.lastPathComponent)
+
+        try? FileManager.default.removeItem(at: localURL)
+
+        do {
+            try FileManager.default.copyItem(at: url, to: localURL)
+            url.stopAccessingSecurityScopedResource()
+            selectedURL = localURL
+        } catch {
             selectedURL = url
         }
     }
 
-    private func isUbiquitous(_ url: URL) -> Bool {
-        FileManager.default.isUbiquitousItem(at: url)
-    }
-
-    private func isDownloaded(_ url: URL) -> Bool {
+    private func isFileDownloaded(_ url: URL) -> Bool {
         let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-        return values?.ubiquitousItemDownloadingStatus == .current
-    }
-
-    private func downloadFromiCloud(_ url: URL, completion: @escaping (Bool) -> Void) {
-        DispatchQueue.global().async {
-            do {
-                try FileManager.default.startDownloadingUbiquitousItem(at: url)
-
-                for _ in 0..<30 {
-                    Thread.sleep(forTimeInterval: 0.3)
-
-                    if self.isDownloaded(url) {
-                        completion(true)
-                        return
-                    }
-                }
-
-                completion(false)
-            } catch {
-                completion(false)
-            }
+        if values?.ubiquitousItemDownloadingStatus == .current {
+            return true
         }
+        if FileManager.default.fileExists(atPath: url.path) {
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let size = attrs?[.size] as? Int ?? 0
+            return size > 0
+        }
+        return false
     }
 
     private func showError(_ message: String) {
@@ -131,7 +155,7 @@ struct QuickLookPreview: UIViewControllerRepresentable {
         return controller
     }
 
-    func updateUIViewController(_ controller: QLPreviewController, context: Context) { }
+    func updateUIViewController(_ controller: QLPreviewController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(url: url)
@@ -144,9 +168,7 @@ struct QuickLookPreview: UIViewControllerRepresentable {
             self.url = url
         }
 
-        func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
-            1
-        }
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
 
         func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
             url as NSURL
