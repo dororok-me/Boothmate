@@ -1,52 +1,67 @@
 import SwiftUI
+import WebKit
 import QuickLook
 import UniformTypeIdentifiers
 import UIKit
 
 struct FileViewerView: View {
     @State private var selectedURL: URL?
+    @State private var fileType: FileType = .none
     @State private var isDownloading = false
     @State private var showAlert = false
-    @State private var alertMessage = false ? "" : ""
+    @State private var alertMessage = ""
     @State private var pickerDelegate: DocumentPickerDelegate?
 
+    enum FileType {
+        case none, webviewable, image, other
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button(action: {
-                    pickFile()
-                }) {
-                    Image(systemName: "plus")
-                        .font(.title2)
+        ZStack {
+            switch fileType {
+            case .none:
+                Color(UIColor.systemBackground)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            case .webviewable:
+                if let url = selectedURL {
+                    WebDocumentView(url: url)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
-                Spacer()
+            case .image:
+                if let url = selectedURL,
+                   let data = try? Data(contentsOf: url),
+                   let uiImage = UIImage(data: data) {
+                    ZoomableImageView(image: uiImage)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
 
-                if isDownloading {
-                    ProgressView()
-                        .scaleEffect(0.8)
+            case .other:
+                if let url = selectedURL {
+                    QuickLookFallback(url: url)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .padding()
-            .background(Color(.systemGray6))
 
-            Divider()
-
-            if let url = selectedURL {
-                QuickLookPreview(url: url)
-            } else {
+            if isDownloading {
                 VStack {
-                    Spacer()
-                    Text("파일을 선택하세요")
+                    ProgressView()
+                    Text("다운로드 중...")
+                        .font(.caption)
                         .foregroundColor(.gray)
-                    Spacer()
+                        .padding(.top, 4)
                 }
             }
         }
+        .clipped()
         .alert("파일 열기 실패", isPresented: $showAlert) {
-            Button("확인", role: .cancel) { }
+            Button("확인", role: .cancel) {}
         } message: {
             Text(alertMessage)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openFilePicker)) { _ in
+            pickFile()
         }
     }
 
@@ -67,7 +82,12 @@ struct FileViewerView: View {
             return
         }
 
-        rootVC.present(picker, animated: true)
+        var topVC = rootVC
+        while let presented = topVC.presentedViewController {
+            topVC = presented
+        }
+
+        topVC.present(picker, animated: true)
     }
 
     private func handlePickedFile(_ url: URL) {
@@ -76,54 +96,86 @@ struct FileViewerView: View {
             return
         }
 
-        if isUbiquitous(url) && !isDownloaded(url) {
+        let fm = FileManager.default
+
+        if fm.isUbiquitousItem(at: url) && !isFileDownloaded(url) {
             isDownloading = true
 
-            downloadFromiCloud(url) { success in
-                DispatchQueue.main.async {
-                    self.isDownloading = false
+            DispatchQueue.global().async {
+                do {
+                    try fm.startDownloadingUbiquitousItem(at: url)
 
-                    if success {
-                        self.selectedURL = url
-                    } else {
+                    for _ in 0..<120 {
+                        Thread.sleep(forTimeInterval: 0.5)
+                        if self.isFileDownloaded(url) {
+                            Thread.sleep(forTimeInterval: 0.5)
+                            DispatchQueue.main.async {
+                                self.isDownloading = false
+                                self.copyAndOpen(url)
+                            }
+                            return
+                        }
+                    }
+
+                    DispatchQueue.main.async {
+                        self.isDownloading = false
                         url.stopAccessingSecurityScopedResource()
-                        self.showError("파일을 다운로드할 수 없습니다.\nFiles 앱에서 먼저 열어주세요.")
+                        self.showError("iCloud에서 다운로드할 수 없습니다.\nFiles 앱에서 먼저 열어주세요.")
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.isDownloading = false
+                        url.stopAccessingSecurityScopedResource()
+                        self.showError("다운로드 오류: \(error.localizedDescription)")
                     }
                 }
             }
         } else {
-            selectedURL = url
+            copyAndOpen(url)
         }
     }
 
-    private func isUbiquitous(_ url: URL) -> Bool {
-        FileManager.default.isUbiquitousItem(at: url)
+    private func copyAndOpen(_ url: URL) {
+        let tempDir = FileManager.default.temporaryDirectory
+        let localURL = tempDir.appendingPathComponent(url.lastPathComponent)
+
+        try? FileManager.default.removeItem(at: localURL)
+
+        do {
+            try FileManager.default.copyItem(at: url, to: localURL)
+            url.stopAccessingSecurityScopedResource()
+            openFile(localURL)
+        } catch {
+            openFile(url)
+        }
     }
 
-    private func isDownloaded(_ url: URL) -> Bool {
+    private func openFile(_ url: URL) {
+        let ext = url.pathExtension.lowercased()
+
+        switch ext {
+        case "pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx", "hwp", "hwpx":
+            fileType = .webviewable
+        case "jpg", "jpeg", "png", "gif", "heic", "heif", "bmp", "tiff":
+            fileType = .image
+        default:
+            fileType = .other
+        }
+
+        selectedURL = url
+    }
+
+    private func isFileDownloaded(_ url: URL) -> Bool {
         let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-        return values?.ubiquitousItemDownloadingStatus == .current
-    }
-
-    private func downloadFromiCloud(_ url: URL, completion: @escaping (Bool) -> Void) {
-        DispatchQueue.global().async {
-            do {
-                try FileManager.default.startDownloadingUbiquitousItem(at: url)
-
-                for _ in 0..<30 {
-                    Thread.sleep(forTimeInterval: 0.3)
-
-                    if self.isDownloaded(url) {
-                        completion(true)
-                        return
-                    }
-                }
-
-                completion(false)
-            } catch {
-                completion(false)
-            }
+        if values?.ubiquitousItemDownloadingStatus == .current {
+            return true
         }
+        if FileManager.default.fileExists(atPath: url.path) {
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let size = attrs?[.size] as? Int ?? 0
+            return size > 0
+        }
+        return false
     }
 
     private func showError(_ message: String) {
@@ -132,16 +184,87 @@ struct FileViewerView: View {
     }
 }
 
-struct QuickLookPreview: UIViewControllerRepresentable {
+// MARK: - WebView로 문서 열기 (PDF, PPT, DOCX, HWP, Excel)
+
+struct WebDocumentView: UIViewRepresentable {
     let url: URL
 
-    func makeUIViewController(context: Context) -> QLPreviewController {
-        let controller = QLPreviewController()
-        controller.dataSource = context.coordinator
-        return controller
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.scrollView.minimumZoomScale = 0.5
+        webView.scrollView.maximumZoomScale = 5.0
+        webView.scrollView.bouncesZoom = true
+        webView.load(URLRequest(url: url))
+        return webView
     }
 
-    func updateUIViewController(_ controller: QLPreviewController, context: Context) { }
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+}
+
+// MARK: - 핀치 줌 가능한 이미지 뷰어
+
+struct ZoomableImageView: UIViewRepresentable {
+    let image: UIImage
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.minimumZoomScale = 0.5
+        scrollView.maximumZoomScale = 5.0
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.delegate = context.coordinator
+
+        let imageView = UIImageView(image: image)
+        imageView.contentMode = .scaleAspectFit
+        imageView.tag = 100
+        scrollView.addSubview(imageView)
+
+        return scrollView
+    }
+
+    func updateUIView(_ scrollView: UIScrollView, context: Context) {
+        guard let imageView = scrollView.viewWithTag(100) as? UIImageView else { return }
+        imageView.frame = scrollView.bounds
+        imageView.image = image
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject, UIScrollViewDelegate {
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            scrollView.viewWithTag(100)
+        }
+    }
+}
+
+// MARK: - QuickLook 폴백 (기타 파일)
+
+struct QuickLookFallback: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+
+        let container = UIViewController()
+        container.addChild(controller)
+        container.view.addSubview(controller.view)
+        controller.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            controller.view.topAnchor.constraint(equalTo: container.view.topAnchor),
+            controller.view.bottomAnchor.constraint(equalTo: container.view.bottomAnchor),
+            controller.view.leadingAnchor.constraint(equalTo: container.view.leadingAnchor),
+            controller.view.trailingAnchor.constraint(equalTo: container.view.trailingAnchor)
+        ])
+        controller.didMove(toParent: container)
+
+        return container
+    }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(url: url)
@@ -154,15 +277,15 @@ struct QuickLookPreview: UIViewControllerRepresentable {
             self.url = url
         }
 
-        func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
-            1
-        }
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
 
         func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
             url as NSURL
         }
     }
 }
+
+// MARK: - Document Picker Delegate
 
 final class DocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
     let onPick: (URL) -> Void

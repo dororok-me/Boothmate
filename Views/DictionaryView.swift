@@ -7,30 +7,14 @@ struct DictionaryView: View {
     @State private var currentWord: String = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(currentWord.isEmpty ? "Dictionary" : currentWord)
-                    .font(.headline)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Button {
-                    currentWord = ""
-                    currentURL = URL(string: "https://dic.daum.net/index.do?dic=eng")!
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.title3)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color(.systemGray6))
-
-            Divider()
-
-            DaumDictionaryWebView(url: currentURL)
-        }
+        DaumDictionaryWebView(url: currentURL)
+                    .onReceive(NotificationCenter.default.publisher(for: .searchDictionary)) { notification in
+                        guard let word = notification.object as? String else { return }
+                        let trimmed = word.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        currentWord = trimmed
+                        currentURL = makeSearchURL(for: trimmed)
+                    }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.searchDictionary)) { notification in
             guard let word = notification.object as? String else { return }
 

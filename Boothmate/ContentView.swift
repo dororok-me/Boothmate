@@ -11,6 +11,10 @@ struct ContentView: View {
 
     @State private var showSettings = false
     @State private var showGlossary = false
+    @State private var menuExpanded = false
+
+    @State private var floatingBarOffset: CGSize = .zero
+    @State private var floatingBarDragOffset: CGSize = .zero
 
     @State private var horizontalSplitDragStart: CGFloat?
     @State private var leftVerticalSplitDragStart: CGFloat?
@@ -18,311 +22,359 @@ struct ContentView: View {
 
     private let dividerHitThickness: CGFloat = 28
     private let visibleDividerThickness: CGFloat = 1
-
     private let minPaneWidth: CGFloat = 90
     private let minPaneHeight: CGFloat = 28
     private let topBarHeight: CGFloat = 50
 
     var body: some View {
-        GeometryReader { geo in
-            let totalWidth = geo.size.width
-            let totalHeight = geo.size.height
+        ZStack {
+            GeometryReader { geo in
+                let totalWidth = geo.size.width
+                let totalHeight = geo.size.height
+                let safeTop = geo.safeAreaInsets.top
+                let safeLeading = geo.safeAreaInsets.leading
+                let isLandscape = totalWidth > totalHeight
+                let leftDangerInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
+                let topSafeSpacing = safeTop + 8
 
-            let safeTop = geo.safeAreaInsets.top
-            let safeLeading = geo.safeAreaInsets.leading
+                let leftWidth = clamp(
+                    value: (totalWidth - dividerHitThickness) * horizontalSplit,
+                    minValue: minPaneWidth,
+                    maxValue: totalWidth - dividerHitThickness - minPaneWidth
+                )
+                let rightWidth = totalWidth - leftWidth - dividerHitThickness
 
-            let isLandscape = totalWidth > totalHeight
+                let leftContentHeight = totalHeight - topSafeSpacing - topBarHeight - dividerHitThickness
+                let rightContentHeight = totalHeight - dividerHitThickness
 
-            // 다이나믹 아일랜드/노치 회피용 내부 여백
-            let leftDangerInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
+                let leftTopHeight = clamp(
+                    value: leftContentHeight * leftVerticalSplit,
+                    minValue: minPaneHeight,
+                    maxValue: leftContentHeight - minPaneHeight
+                )
+                let leftBottomHeight = leftContentHeight - leftTopHeight
 
-            let topSafeSpacing = safeTop + 8
+                let rightTopHeight = clamp(
+                    value: rightContentHeight * rightVerticalSplit,
+                    minValue: minPaneHeight,
+                    maxValue: rightContentHeight - minPaneHeight
+                )
+                let rightBottomHeight = rightContentHeight - rightTopHeight
 
-            // 좌우 분할 계산은 전체 폭 기준으로 유지
-            let leftWidth = clamp(
-                value: (totalWidth - dividerHitThickness) * horizontalSplit,
-                minValue: minPaneWidth,
-                maxValue: totalWidth - dividerHitThickness - minPaneWidth
-            )
+                HStack(spacing: 0) {
+                    // MARK: - 왼쪽: 자막 + 메모
+                    VStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: topBarHeight)
+                            .padding(.top, topSafeSpacing)
 
-            let rightWidth = totalWidth - leftWidth - dividerHitThickness
+                        subtitleArea(leftDangerInset: leftDangerInset)
+                            .frame(width: leftWidth, height: leftTopHeight)
+                            .background(speechManager.selectedTheme.backgroundColor)
 
-            let leftContentHeight = totalHeight - topSafeSpacing - topBarHeight - dividerHitThickness
-            let rightContentHeight = totalHeight - dividerHitThickness
+                        horizontalDragHandle
+                            .frame(width: leftWidth, height: dividerHitThickness)
+                            .contentShape(Rectangle())
+                            .highPriorityGesture(
+                                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                                    .onChanged { value in
+                                        if leftVerticalSplitDragStart == nil {
+                                            leftVerticalSplitDragStart = leftVerticalSplit
+                                        }
+                                        guard let start = leftVerticalSplitDragStart else { return }
+                                        let delta = value.translation.height / leftContentHeight
+                                        withTransaction(Transaction(animation: nil)) {
+                                            leftVerticalSplit = clamp(
+                                                value: start + delta,
+                                                minValue: minPaneHeight / leftContentHeight,
+                                                maxValue: 1 - (minPaneHeight / leftContentHeight)
+                                            )
+                                        }
+                                    }
+                                    .onEnded { _ in
+                                        leftVerticalSplitDragStart = nil
+                                    }
+                            )
 
-            let leftTopHeight = clamp(
-                value: leftContentHeight * leftVerticalSplit,
-                minValue: minPaneHeight,
-                maxValue: leftContentHeight - minPaneHeight
-            )
+                        MemoView()
+                            .frame(width: leftWidth, height: leftBottomHeight)
+                            .background(Color(.systemBackground))
+                    }
 
-            let leftBottomHeight = leftContentHeight - leftTopHeight
-
-            let rightTopHeight = clamp(
-                value: rightContentHeight * rightVerticalSplit,
-                minValue: minPaneHeight,
-                maxValue: rightContentHeight - minPaneHeight
-            )
-
-            let rightBottomHeight = rightContentHeight - rightTopHeight
-
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    topBar(leftDangerInset: leftDangerInset)
-                        .frame(height: topBarHeight)
-                        .padding(.top, topSafeSpacing)
-
-                    subtitleArea(leftDangerInset: leftDangerInset)
-                        .frame(width: leftWidth, height: leftTopHeight)
-                        .background(speechManager.selectedTheme.backgroundColor)
-
-                    horizontalDragHandle
-                        .frame(width: leftWidth, height: dividerHitThickness)
+                    // MARK: - 좌우 드래그 핸들
+                    verticalDragHandle
+                        .frame(width: dividerHitThickness, height: totalHeight)
                         .contentShape(Rectangle())
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 0, coordinateSpace: .global)
                                 .onChanged { value in
-                                    if leftVerticalSplitDragStart == nil {
-                                        leftVerticalSplitDragStart = leftVerticalSplit
+                                    if horizontalSplitDragStart == nil {
+                                        horizontalSplitDragStart = horizontalSplit
                                     }
-
-                                    guard let start = leftVerticalSplitDragStart else { return }
-
-                                    let delta = value.translation.height / leftContentHeight
-                                    let newSplit = start + delta
-
+                                    guard let start = horizontalSplitDragStart else { return }
+                                    let delta = value.translation.width / (totalWidth - dividerHitThickness)
                                     withTransaction(Transaction(animation: nil)) {
-                                        leftVerticalSplit = clamp(
-                                            value: newSplit,
-                                            minValue: minPaneHeight / leftContentHeight,
-                                            maxValue: 1 - (minPaneHeight / leftContentHeight)
+                                        horizontalSplit = clamp(
+                                            value: start + delta,
+                                            minValue: minPaneWidth / (totalWidth - dividerHitThickness),
+                                            maxValue: 1 - (minPaneWidth / (totalWidth - dividerHitThickness))
                                         )
                                     }
                                 }
                                 .onEnded { _ in
-                                    leftVerticalSplitDragStart = nil
+                                    horizontalSplitDragStart = nil
                                 }
                         )
 
-                    MemoView()
-                        .frame(width: leftWidth, height: leftBottomHeight)
-                        .background(Color(.systemBackground))
+                    // MARK: - 오른쪽: 파일뷰어 + 사전
+                    VStack(spacing: 0) {
+                        FileViewerView()
+                            .frame(width: rightWidth, height: rightTopHeight)
+                            .background(Color(.systemBackground))
+
+                        horizontalDragHandle
+                            .frame(width: rightWidth, height: dividerHitThickness)
+                            .contentShape(Rectangle())
+                            .highPriorityGesture(
+                                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                                    .onChanged { value in
+                                        if rightVerticalSplitDragStart == nil {
+                                            rightVerticalSplitDragStart = rightVerticalSplit
+                                        }
+                                        guard let start = rightVerticalSplitDragStart else { return }
+                                        let delta = value.translation.height / rightContentHeight
+                                        withTransaction(Transaction(animation: nil)) {
+                                            rightVerticalSplit = clamp(
+                                                value: start + delta,
+                                                minValue: minPaneHeight / rightContentHeight,
+                                                maxValue: 1 - (minPaneHeight / rightContentHeight)
+                                            )
+                                        }
+                                    }
+                                    .onEnded { _ in
+                                        rightVerticalSplitDragStart = nil
+                                    }
+                            )
+
+                        DictionaryView()
+                            .frame(width: rightWidth, height: rightBottomHeight)
+                            .background(Color(.systemBackground))
+                    }
                 }
-
-                verticalDragHandle
-                    .frame(width: dividerHitThickness, height: totalHeight)
-                    .contentShape(Rectangle())
-                    .highPriorityGesture(
-                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                            .onChanged { value in
-                                if horizontalSplitDragStart == nil {
-                                    horizontalSplitDragStart = horizontalSplit
-                                }
-
-                                guard let start = horizontalSplitDragStart else { return }
-
-                                let delta = value.translation.width / (totalWidth - dividerHitThickness)
-                                let newSplit = start + delta
-
-                                withTransaction(Transaction(animation: nil)) {
-                                    horizontalSplit = clamp(
-                                        value: newSplit,
-                                        minValue: minPaneWidth / (totalWidth - dividerHitThickness),
-                                        maxValue: 1 - (minPaneWidth / (totalWidth - dividerHitThickness))
-                                    )
-                                }
-                            }
-                            .onEnded { _ in
-                                horizontalSplitDragStart = nil
-                            }
-                    )
-
-                VStack(spacing: 0) {
-                    FileViewerView()
-                        .frame(width: rightWidth, height: rightTopHeight)
-                        .background(Color(.systemBackground))
-
-                    horizontalDragHandle
-                        .frame(width: rightWidth, height: dividerHitThickness)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                                .onChanged { value in
-                                    if rightVerticalSplitDragStart == nil {
-                                        rightVerticalSplitDragStart = rightVerticalSplit
-                                    }
-
-                                    guard let start = rightVerticalSplitDragStart else { return }
-
-                                    let delta = value.translation.height / rightContentHeight
-                                    let newSplit = start + delta
-
-                                    withTransaction(Transaction(animation: nil)) {
-                                        rightVerticalSplit = clamp(
-                                            value: newSplit,
-                                            minValue: minPaneHeight / rightContentHeight,
-                                            maxValue: 1 - (minPaneHeight / rightContentHeight)
-                                        )
-                                    }
-                                }
-                                .onEnded { _ in
-                                    rightVerticalSplitDragStart = nil
-                                }
-                        )
-
-                    DictionaryView()
-                        .frame(width: rightWidth, height: rightBottomHeight)
-                        .background(Color(.systemBackground))
+                .frame(width: totalWidth, height: totalHeight)
+            }
+            .ignoresSafeArea()
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        dismissKeyboard()
+                    }
                 }
             }
-            .frame(width: totalWidth, height: totalHeight)
-        }
-        .ignoresSafeArea()
-        .onAppear {
-            speechManager.requestPermissions()
-            speechManager.glossaryStore = glossaryStore
-        }
-        .sheet(isPresented: $showGlossary) {
-            GlossaryView(glossaryStore: glossaryStore)
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(speechManager: speechManager)
+            .onAppear {
+                speechManager.requestPermissions()
+                speechManager.glossaryStore = glossaryStore
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView(speechManager: speechManager)
+            }
+            .sheet(isPresented: $showGlossary) {
+                GlossaryView(glossaryStore: glossaryStore)
+            }
+
+            // MARK: - 플로팅 메뉴바
+            floatingMenuBar
         }
     }
 
-    private func topBar(leftDangerInset: CGFloat) -> some View {
-        HStack(spacing: 8) {
-            Spacer()
+    // MARK: - Floating Menu Bar
 
-            toolbarIconButton(systemName: "text.book.closed") {
-                showGlossary = true
-            }
+    private var floatingMenuBar: some View {
+        let totalOffset = CGSize(
+            width: floatingBarOffset.width + floatingBarDragOffset.width,
+            height: floatingBarOffset.height + floatingBarDragOffset.height
+        )
 
-            toolbarIconButton(systemName: "arrow.counterclockwise") {
-                speechManager.clearSubtitles()
-            }
+        return HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.gray)
+                .frame(width: 28, height: 32)
+                .padding(.leading, 2)
 
-            toolbarIconButton(systemName: "keyboard.chevron.compact.down") {
-                dismissKeyboard()
-            }
+            recordButton
 
-            toolbarIconButton(systemName: "gearshape") {
-                showSettings = true
-            }
-
-            fontSizeButton
-
-            toolbarIconButton(systemName: "keyboard.chevron.compact.down") {
-                dismissKeyboard()
-            }
+            Button {
+                            if speechManager.isPaused {
+                                speechManager.resumeRecording()
+                            } else {
+                                speechManager.pauseRecording()
+                            }
+                        } label: {
+                            Image(systemName: speechManager.isPaused ? "play.fill" : "pause.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(speechManager.isPaused ? .orange : .primary)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(speechManager.isRecording ? 1 : 0.3)
+                        .disabled(!speechManager.isRecording)
 
             languageToggle
 
-            recordButton
-        }
-        .padding(.leading, 10 + leftDangerInset)
-        .padding(.trailing, 10)
-        .background(Color.clear)
-    }
-
-    private var languageToggle: some View {
-        HStack(spacing: 0) {
-            Button {
-                speechManager.selectedLanguage = "en-US"
-            } label: {
-                Text("EN")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 42, height: 32)
-                    .background(
-                        speechManager.selectedLanguage == "en-US" ? Color.blue : Color.clear
-                    )
-                    .foregroundColor(
-                        speechManager.selectedLanguage == "en-US" ? .white : .primary
-                    )
+            Button(action: { pickFileFromFloating() }) {
+                Image(systemName: "folder.badge.plus")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .frame(width: 32, height: 32)
             }
+            .buttonStyle(.plain)
 
             Button {
-                speechManager.selectedLanguage = "ko-KR"
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    menuExpanded.toggle()
+                }
             } label: {
-                Text("KR")
+                Image(systemName: menuExpanded ? "chevron.left" : "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 42, height: 32)
-                    .background(
-                        speechManager.selectedLanguage == "ko-KR" ? Color.blue : Color.clear
-                    )
-                    .foregroundColor(
-                        speechManager.selectedLanguage == "ko-KR" ? .white : .primary
-                    )
+                    .foregroundColor(.gray)
+                    .frame(width: 24, height: 32)
             }
-        }
-        .background(Color.gray.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-    }
+            .buttonStyle(.plain)
 
-    private var fontSizeButton: some View {
-        Button {
-            speechManager.cycleFontSize()
-        } label: {
-            HStack(spacing: 1) {
-                Text("a")
-                    .font(.system(size: 12, weight: .medium))
-                Text("A")
-                    .font(.system(size: 21, weight: .bold))
-            }
-            .foregroundColor(.primary)
-            .frame(width: 38, height: 32)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var recordButton: some View {
-            HStack(spacing: 4) {
+            if menuExpanded {
                 Button {
-                    if speechManager.isRecording {
-                        speechManager.stopRecording()
-                    } else {
-                        speechManager.startRecording()
-                    }
+                    speechManager.clearSubtitles()
                 } label: {
-                    ZStack {
-                        Circle()
-                            .fill(speechManager.isRecording ? Color.red : Color.red.opacity(0.12))
-                            .frame(width: 32, height: 32)
-                        Image(systemName: speechManager.isRecording ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(speechManager.isRecording ? .white : .red)
-                    }
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)
 
-                if speechManager.isRecording {
-                    VStack(spacing: 0) {
-                        Text(String(format: "%02d", speechManager.elapsedSeconds / 60))
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.secondary)
-                        Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.secondary)
+                Button {
+                    showGlossary = true
+                } label: {
+                    Image(systemName: "text.book.closed")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    speechManager.cycleFontSize()
+                } label: {
+                    HStack(spacing: 0) {
+                        Text("A").font(.system(size: 13, weight: .medium))
+                        Text("A").font(.system(size: 20, weight: .bold))
                     }
-                    .frame(width: 20)
+                    .foregroundColor(.primary)
+                    .frame(width: 38, height: 32)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 12)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .offset(x: totalOffset.width, y: totalOffset.height)
+        .transaction { t in
+            t.animation = nil
+        }
+        .simultaneousGesture(
+            DragGesture(coordinateSpace: .global)
+                .onChanged { value in
+                    floatingBarDragOffset = CGSize(
+                        width: value.translation.width,
+                        height: value.translation.height
+                    )
+                }
+                .onEnded { value in
+                    floatingBarOffset = CGSize(
+                        width: floatingBarOffset.width + value.translation.width,
+                        height: floatingBarOffset.height + value.translation.height
+                    )
+                    floatingBarDragOffset = .zero
+                }
+        )
+    }
+
+    // MARK: - Language Toggle
+
+    private var languageToggle: some View {
+        HStack(spacing: 0) {
+            ForEach(speechManager.languages, id: \.1) { name, code in
+                Button {
+                    speechManager.selectedLanguage = code
+                } label: {
+                    Text(name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 32, height: 28)
+                        .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
+                        .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
                 }
             }
         }
+        .background(Color.gray.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
 
-    private func toolbarIconButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.primary)
-                .frame(width: 32, height: 32)
+    // MARK: - Record Button
+
+    private var recordButton: some View {
+        Button {
+            if speechManager.isRecording {
+                speechManager.stopRecording()
+            } else {
+                speechManager.startRecording()
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(speechManager.isRecording ? Color.red : Color.green)
+                    .frame(width: 36, height: 36)
+
+                if speechManager.isRecording {
+                    VStack(spacing: 0) {
+                        Text(String(format: "%02d:", speechManager.elapsedSeconds / 60))
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                        Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                    }
+                } else {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                }
+            }
         }
         .buttonStyle(.plain)
     }
+
+    // MARK: - Subtitle Area
 
     private func subtitleArea(leftDangerInset: CGFloat) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: speechManager.lineSpacing) {
                     ForEach(speechManager.subtitles.indices, id: \.self) { index in
                         subtitleBlock(
                             text: speechManager.subtitles[index],
@@ -359,26 +411,28 @@ struct ContentView: View {
             }
         }
     }
-    
+
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         DispatchQueue.main.async {
-            withAnimation(.easeOut(duration: 0.15)) {
-                proxy.scrollTo("bottomAnchor", anchor: .bottom)
-            }
+            proxy.scrollTo("bottomAnchor", anchor: .bottom)
         }
     }
 
+    // MARK: - Subtitle Block
+
     private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
-        SubtitleTextView(
-            text: text,
-            fontSize: speechManager.fontSize,
-            textColor: speechManager.selectedTheme.textColor.opacity(opacity),
-            glossaryStore: glossaryStore
-        ) { word in
+        TappableText(
+                    text: text,
+                    fontSize: speechManager.fontSize,
+                    textColor: speechManager.selectedTheme.textColor.opacity(opacity),
+                    glossaryColor: speechManager.glossaryEnabled
+                        ? speechManager.glossaryColor.color
+                        : speechManager.selectedTheme.textColor.opacity(opacity),
+                    lineSpacing: speechManager.lineSpacing
+                ) { word in
             NotificationCenter.default.post(
-                name: Notification.Name.searchDictionary,
-                object: word,
-                userInfo: nil
+                name: .searchDictionary,
+                object: word
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -386,44 +440,36 @@ struct ContentView: View {
         .padding(.trailing, 20)
     }
 
+    // MARK: - Drag Handles
+
     private var verticalDragHandle: some View {
         ZStack {
-            Rectangle()
-                .fill(Color.clear)
-
-            Rectangle()
-                .fill(Color.gray.opacity(0.14))
-                .frame(width: visibleDividerThickness)
-
-            Capsule()
-                .fill(Color.gray.opacity(0.55))
-                .frame(width: 4, height: 34)
+            Rectangle().fill(Color.clear)
+            Rectangle().fill(Color.gray.opacity(0.14)).frame(width: visibleDividerThickness)
+            Capsule().fill(Color.gray.opacity(0.55)).frame(width: 4, height: 34)
         }
         .contentShape(Rectangle())
     }
 
     private var horizontalDragHandle: some View {
         ZStack {
-            Rectangle()
-                .fill(Color.clear)
-
-            Rectangle()
-                .fill(Color.gray.opacity(0.14))
-                .frame(height: visibleDividerThickness)
-
-            Capsule()
-                .fill(Color.gray.opacity(0.55))
-                .frame(width: 34, height: 4)
+            Rectangle().fill(Color.clear)
+            Rectangle().fill(Color.gray.opacity(0.14)).frame(height: visibleDividerThickness)
+            Capsule().fill(Color.gray.opacity(0.55)).frame(width: 34, height: 4)
         }
         .contentShape(Rectangle())
+    }
+
+    // MARK: - Helpers
+
+    private func pickFileFromFloating() {
+        NotificationCenter.default.post(name: .openFilePicker, object: nil)
     }
 
     private func dismissKeyboard() {
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
-            to: nil,
-            from: nil,
-            for: nil
+            to: nil, from: nil, for: nil
         )
     }
 
