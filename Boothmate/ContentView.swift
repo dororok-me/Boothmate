@@ -438,21 +438,25 @@ struct ContentView: View {
 
     // MARK: - Subtitle Block
 
+    // MARK: - Subtitle Block (ContentView.swift 하단)
+
     private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
         TappableText(
-                    text: text,
-                    fontSize: speechManager.fontSize,
-                    textColor: speechManager.selectedTheme.textColor.opacity(opacity),
-                    glossaryColor: speechManager.glossaryEnabled
-                        ? speechManager.glossaryColor.color
-                        : speechManager.selectedTheme.textColor.opacity(opacity),
-                    lineSpacing: speechManager.lineSpacing
-                ) { word in
-            NotificationCenter.default.post(
-                name: .searchDictionary,
-                object: word
-            )
-        }
+            text: text,
+            fontSize: speechManager.fontSize,
+            textColor: speechManager.selectedTheme.textColor.opacity(opacity),
+            glossaryColor: speechManager.glossaryEnabled
+                ? speechManager.glossaryColor.color
+                : speechManager.selectedTheme.textColor.opacity(opacity),
+            lineSpacing: speechManager.lineSpacing,
+            glossaryStore: glossaryStore, // 👈 이 줄을 추가하세요!
+            onTapWord: { word in
+                NotificationCenter.default.post(
+                    name: .searchDictionary,
+                    object: word
+                )
+            }
+        )
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.leading, 20 + leftDangerInset)
         .padding(.trailing, 20)
