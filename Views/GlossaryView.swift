@@ -7,6 +7,7 @@ struct GlossaryView: View {
 
     @State private var newSource = ""
     @State private var newTarget = ""
+    @State private var newSynonyms = "" // 유의어 입력 상태 추가
     @State private var searchText = ""
 
     @State private var showDeleteAllAlert = false
@@ -16,6 +17,7 @@ struct GlossaryView: View {
     @State private var selectedEntry: GlossaryStore.GlossaryEntry?
     @State private var editSource = ""
     @State private var editTarget = ""
+    @State private var editSynonyms = "" // 유의어 수정 상태 추가
     @State private var showEditSheet = false
     @State private var showDeleteEntryAlert = false
 
@@ -26,7 +28,8 @@ struct GlossaryView: View {
 
         return glossaryStore.entries.filter {
             $0.source.localizedCaseInsensitiveContains(searchText) ||
-            $0.target.localizedCaseInsensitiveContains(searchText)
+            $0.target.localizedCaseInsensitiveContains(searchText) ||
+            $0.synonyms.joined(separator: " ").localizedCaseInsensitiveContains(searchText)
         }
     }
 
@@ -112,20 +115,26 @@ struct GlossaryView: View {
     }
 
     private var addSection: some View {
-        HStack(spacing: 10) {
-            TextField("원어", text: $newSource)
-                .textFieldStyle(.roundedBorder)
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                TextField("원어", text: $newSource)
+                    .textFieldStyle(.roundedBorder)
 
-            TextField("번역/설명", text: $newTarget)
-                .textFieldStyle(.roundedBorder)
+                TextField("번역/설명", text: $newTarget)
+                    .textFieldStyle(.roundedBorder)
 
-            Button {
-                addEntry()
-            } label: {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.blue)
+                Button {
+                    addEntry()
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                }
             }
+            
+            TextField("유의어 (콤마로 구분: AI, A.I.)", text: $newSynonyms)
+                .textFieldStyle(.roundedBorder)
+                .font(.caption)
         }
         .padding()
     }
@@ -171,15 +180,24 @@ struct GlossaryView: View {
                 Button {
                     openEditSheet(for: entry)
                 } label: {
-                    HStack {
-                        Text(entry.source)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(entry.source)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
 
-                        Spacer()
+                            Spacer()
 
-                        Text(entry.target)
-                            .foregroundColor(.gray)
+                            Text(entry.target)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        if !entry.synonyms.isEmpty {
+                            Text(entry.synonyms.joined(separator: ", "))
+                                .font(.caption2)
+                                .foregroundColor(.blue.opacity(0.8))
+                                .lineLimit(1)
+                        }
                     }
                 }
             }
@@ -195,11 +213,23 @@ struct GlossaryView: View {
     private var editSheet: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                TextField("원어", text: $editSource)
-                    .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("원어").font(.caption).foregroundColor(.gray)
+                    TextField("원어", text: $editSource)
+                        .textFieldStyle(.roundedBorder)
+                }
 
-                TextField("번역/설명", text: $editTarget)
-                    .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("번역/설명").font(.caption).foregroundColor(.gray)
+                    TextField("번역/설명", text: $editTarget)
+                        .textFieldStyle(.roundedBorder)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("유의어 (콤마로 구분)").font(.caption).foregroundColor(.gray)
+                    TextField("유의어", text: $editSynonyms)
+                        .textFieldStyle(.roundedBorder)
+                }
 
                 Spacer()
             }
@@ -235,18 +265,23 @@ struct GlossaryView: View {
     private func addEntry() {
         let source = newSource.trimmingCharacters(in: .whitespacesAndNewlines)
         let target = newTarget.trimmingCharacters(in: .whitespacesAndNewlines)
+        let synonymsArray = newSynonyms.components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
 
         guard !source.isEmpty, !target.isEmpty else { return }
 
-        glossaryStore.add(source: source, target: target)
+        glossaryStore.add(source: source, target: target, synonyms: synonymsArray)
         newSource = ""
         newTarget = ""
+        newSynonyms = ""
     }
 
     private func openEditSheet(for entry: GlossaryStore.GlossaryEntry) {
         selectedEntry = entry
         editSource = entry.source
         editTarget = entry.target
+        editSynonyms = entry.synonyms.joined(separator: ", ")
         showEditSheet = true
     }
 
@@ -255,6 +290,9 @@ struct GlossaryView: View {
 
         let source = editSource.trimmingCharacters(in: .whitespacesAndNewlines)
         let target = editTarget.trimmingCharacters(in: .whitespacesAndNewlines)
+        let synonymsArray = editSynonyms.components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
 
         guard !source.isEmpty, !target.isEmpty else { return }
 
@@ -265,6 +303,7 @@ struct GlossaryView: View {
 
         glossaryStore.entries[index].source = source
         glossaryStore.entries[index].target = target
+        glossaryStore.entries[index].synonyms = synonymsArray
         glossaryStore.save()
         showEditSheet = false
     }
@@ -281,6 +320,7 @@ struct GlossaryView: View {
     }
 }
 
+// MARK: - CSV Document Export logic
 struct CSVDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.commaSeparatedText] }
 
@@ -295,12 +335,15 @@ struct CSVDocument: FileDocument {
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        var csv = "source,target\n"
+        // 유의어까지 내보내기 위해 헤더 수정
+        var csv = "source,target,synonyms\n"
 
         for entry in entries {
             let source = entry.source.replacingOccurrences(of: ",", with: "，")
             let target = entry.target.replacingOccurrences(of: ",", with: "，")
-            csv += "\(source),\(target)\n"
+            // 유의어는 세미콜론(;)으로 구분하여 저장 (CSV 파싱 오류 방지)
+            let synonyms = entry.synonyms.joined(separator: ";").replacingOccurrences(of: ",", with: "，")
+            csv += "\(source),\(target),\(synonyms)\n"
         }
 
         return FileWrapper(regularFileWithContents: Data(csv.utf8))
