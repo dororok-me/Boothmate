@@ -4,25 +4,18 @@ import Combine
 struct SubtitleView: View {
     @ObservedObject var speechManager: SpeechManager
     @ObservedObject var glossaryStore: GlossaryStore
+    
     @State private var showMenu = false
     @State private var showGlossary = false
-    @State private var fontSizeLevel = 1
-
-    private var subtitleFont: Font {
-        switch fontSizeLevel {
-        case 0: return .body
-        case 2: return .largeTitle
-        default: return .title3
-        }
-    }
-
+    
+    // 강조 색상 (Boothmate 테마)
     private let accent = Color(red: 1.0, green: 0.55, blue: 0.25)
 
     var body: some View {
         VStack(spacing: 0) {
-            // 상단 컨트롤 바 - 중앙 정렬
+            // MARK: - 상단 컨트롤 바
             HStack(spacing: 0) {
-                // 왼쪽: 글로서리 + 언어
+                // 왼쪽: 글로서리 + 언어 전환
                 HStack(spacing: 16) {
                     Button {
                         showGlossary.toggle()
@@ -34,11 +27,7 @@ struct SubtitleView: View {
                     }
 
                     Button {
-                        if speechManager.selectedLanguage == "en-US" {
-                            speechManager.selectedLanguage = "ko-KR"
-                        } else {
-                            speechManager.selectedLanguage = "en-US"
-                        }
+                        speechManager.selectedLanguage = (speechManager.selectedLanguage == "en-US") ? "ko-KR" : "en-US"
                     } label: {
                         HStack(spacing: 0) {
                             Text("EN")
@@ -75,13 +64,9 @@ struct SubtitleView: View {
                         .frame(width: 48, height: 48)
                         .background(speechManager.isRecording ? accent : accent.opacity(0.15))
                         .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(accent.opacity(0.3), lineWidth: speechManager.isRecording ? 0 : 1)
-                        )
                 }
 
-                // 오른쪽: 지우기 + 설정
+                // 오른쪽: 초기화 + 설정
                 HStack(spacing: 16) {
                     Button {
                         speechManager.clearSubtitles()
@@ -105,82 +90,74 @@ struct SubtitleView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(
-                Color.black.opacity(0.9)
-                    .overlay(accent.opacity(0.06))
-            )
+            .background(Color.black.opacity(0.9).overlay(accent.opacity(0.06)))
 
-            // 확정된 자막
+            // MARK: - 확정된 자막 리스트 (자동 스크롤 적용)
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 12) {
                         ForEach(Array(speechManager.subtitles.enumerated()), id: \.offset) { index, text in
-                            Text(text)
-                                .foregroundColor(.white)
-                                .font(subtitleFont)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .id(index)
+                            TappableText(
+                                text: text,
+                                fontSize: speechManager.fontSize,
+                                textColor: .white,
+                                glossaryColor: speechManager.glossaryColor.color,
+                                lineSpacing: speechManager.lineSpacing,
+                                glossaryStore: glossaryStore, // 👈 인자 추가
+                                onTapWord: { word in
+                                    NotificationCenter.default.post(name: .searchDictionary, object: word)
+                                }
+                            )
+                            .id(index)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.top, 12)
                 }
-                .onChange(of: speechManager.subtitles.count) {
-                    if let last = speechManager.subtitles.indices.last {
-                        proxy.scrollTo(last, anchor: .bottom)
+                .onChange(of: speechManager.subtitles.count) { _ in
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo(speechManager.subtitles.count - 1, anchor: .bottom)
                     }
                 }
             }
 
-            // 현재 인식 중 (하단 고정)
-            Text(speechManager.currentText.isEmpty ? " " : speechManager.currentText)
-                .foregroundColor(.yellow)
-                .font(subtitleFont)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background(Color.black)
+            // MARK: - 실시간 인식 중인 텍스트 (하단 고정)
+            VStack(spacing: 0) {
+                Divider().background(accent.opacity(0.3))
+                
+                if !speechManager.currentText.isEmpty {
+                    TappableText(
+                        text: speechManager.currentText,
+                        fontSize: speechManager.fontSize,
+                        textColor: .yellow,
+                        glossaryColor: speechManager.glossaryColor.color,
+                        lineSpacing: speechManager.lineSpacing,
+                        glossaryStore: glossaryStore, // 👈 인자 추가
+                        onTapWord: { word in
+                            NotificationCenter.default.post(name: .searchDictionary, object: word)
+                        }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                } else {
+                    Text("대기 중...")
+                        .font(.system(size: speechManager.fontSize))
+                        .foregroundColor(.gray.opacity(0.5))
+                        .padding(.vertical, 12)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+            .background(Color.black)
         }
-        .background(Color.black)
-        .safeAreaPadding(.top)
+        .background(Color.black.ignoresSafeArea())
         .onAppear {
             speechManager.requestPermissions()
         }
         .sheet(isPresented: $showMenu) {
-            SubtitleMenuView(speechManager: speechManager)
+            SettingsView(speechManager: speechManager)
         }
         .sheet(isPresented: $showGlossary) {
             GlossaryView(glossaryStore: glossaryStore)
-        }
-    }
-}
-
-struct SubtitleMenuView: View {
-    @ObservedObject var speechManager: SpeechManager
-    @Environment(\.dismiss) var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("음성인식 엔진") {
-                    Text("Apple (기본)")
-                }
-                Section("설정") {
-                    Text("폰트 크기")
-                    Text("추가 설정")
-                }
-            }
-            .navigationTitle("설정")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") {
-                        dismiss()
-                    }
-                }
-            }
         }
     }
 }
