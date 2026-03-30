@@ -182,8 +182,19 @@ struct TappableText: UIViewRepresentable {
                              .replacingOccurrences(of: ")", with: "")
 
             if !cleaned.isEmpty {
-                onTapWord(cleaned)
-            }
+                            // 탭한 단어 하이라이트
+                            let highlightRange = NSRange(location: wordStart, length: wordEnd - wordStart)
+                            let highlighted = NSMutableAttributedString(attributedString: attributedText)
+                            highlighted.addAttribute(.backgroundColor, value: UIColor.systemYellow.withAlphaComponent(0.4), range: highlightRange)
+                            label.attributedText = highlighted
+
+                            // 0.6초 후 원래대로
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                                label.attributedText = attributedText
+                            }
+
+                            onTapWord(cleaned)
+                        }
         }
     }
 }

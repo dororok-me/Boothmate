@@ -5,41 +5,56 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct FileViewerView: View {
+
+    // MARK: - State
+
     @State private var selectedURL: URL?
+    @State private var loadedImage: UIImage?
     @State private var fileType: FileType = .none
     @State private var isDownloading = false
     @State private var showAlert = false
     @State private var alertMessage = ""
     @State private var pickerDelegate: DocumentPickerDelegate?
+    @State private var fileKey = UUID()
 
     enum FileType {
         case none, webviewable, image, other
     }
 
+    // MARK: - Body
+
     var body: some View {
         ZStack {
+            Color(UIColor.systemBackground)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
             switch fileType {
             case .none:
-                Color(UIColor.systemBackground)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Button(action: { pickFile() }) {
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 28))
+                        .foregroundColor(.gray.opacity(0.35))
+                }
+                .buttonStyle(.plain)
 
             case .webviewable:
                 if let url = selectedURL {
                     WebDocumentView(url: url)
+                        .id(fileKey)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
             case .image:
-                if let url = selectedURL,
-                   let data = try? Data(contentsOf: url),
-                   let uiImage = UIImage(data: data) {
-                    ZoomableImageView(image: uiImage)
+                if let image = loadedImage {
+                    ZoomableImageView(image: image)
+                        .id(fileKey)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
             case .other:
                 if let url = selectedURL {
                     QuickLookFallback(url: url)
+                        .id(fileKey)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -52,6 +67,8 @@ struct FileViewerView: View {
                         .foregroundColor(.gray)
                         .padding(.top, 4)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(UIColor.systemBackground).opacity(0.8))
             }
         }
         .clipped()
@@ -65,9 +82,12 @@ struct FileViewerView: View {
         }
     }
 
+    // MARK: - File Picker
+
     private func pickFile() {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item])
         picker.allowsMultipleSelection = false
+        picker.shouldShowFileExtensions = true
 
         let delegate = DocumentPickerDelegate { url in
             handlePickedFile(url)
@@ -90,6 +110,8 @@ struct FileViewerView: View {
         topVC.present(picker, animated: true)
     }
 
+    // MARK: - File Handling
+
     private func handlePickedFile(_ url: URL) {
         guard url.startAccessingSecurityScopedResource() else {
             showError("파일 접근 권한이 없습니다.")
@@ -98,6 +120,7 @@ struct FileViewerView: View {
 
         let fm = FileManager.default
 
+        // iCloud 파일 다운로드
         if fm.isUbiquitousItem(at: url) && !isFileDownloaded(url) {
             isDownloading = true
 
@@ -111,7 +134,7 @@ struct FileViewerView: View {
                             Thread.sleep(forTimeInterval: 0.5)
                             DispatchQueue.main.async {
                                 self.isDownloading = false
-                                self.copyAndOpen(url)
+                                self.processFile(url)
                             }
                             return
                         }
@@ -131,11 +154,50 @@ struct FileViewerView: View {
                 }
             }
         } else {
-            copyAndOpen(url)
+            processFile(url)
         }
     }
 
-    private func copyAndOpen(_ url: URL) {
+    private func processFile(_ url: URL) {
+        let ext = url.pathExtension.lowercased()
+
+        // 이미지: 보안 접근 중 바로 메모리 로드
+        if isImageExtension(ext) {
+            if let data = try? Data(contentsOf: url),
+               let image = UIImage(data: data) {
+                url.stopAccessingSecurityScopedResource()
+                loadedImage = image
+                fileType = .image
+                selectedURL = url
+                fileKey = UUID()
+                return
+            }
+            // 실패 시 복사 후 재시도
+            if let localURL = copyToTemp(url) {
+                if let data = try? Data(contentsOf: localURL),
+                   let image = UIImage(data: data) {
+                    loadedImage = image
+                    fileType = .image
+                    selectedURL = localURL
+                    fileKey = UUID()
+                    return
+                }
+            }
+            url.stopAccessingSecurityScopedResource()
+            showError("이미지를 열 수 없습니다.")
+            return
+        }
+
+        // 문서 파일: 복사 후 열기
+        if let localURL = copyToTemp(url) {
+            openFile(localURL)
+        } else {
+            // 복사 실패 시 원본으로 시도
+            openFile(url)
+        }
+    }
+
+    private func copyToTemp(_ url: URL) -> URL? {
         let tempDir = FileManager.default.temporaryDirectory
         let localURL = tempDir.appendingPathComponent(url.lastPathComponent)
 
@@ -144,26 +206,39 @@ struct FileViewerView: View {
         do {
             try FileManager.default.copyItem(at: url, to: localURL)
             url.stopAccessingSecurityScopedResource()
-            openFile(localURL)
+            return localURL
         } catch {
-            openFile(url)
+            return nil
         }
     }
 
     private func openFile(_ url: URL) {
         let ext = url.pathExtension.lowercased()
 
-        switch ext {
-        case "pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx", "hwp", "hwpx":
+        if isWebViewExtension(ext) {
             fileType = .webviewable
-        case "jpg", "jpeg", "png", "gif", "heic", "heif", "bmp", "tiff":
+        } else if isImageExtension(ext) {
             fileType = .image
-        default:
+        } else {
             fileType = .other
         }
 
         selectedURL = url
+        fileKey = UUID()
     }
+
+    // MARK: - Extension Check
+
+    private func isImageExtension(_ ext: String) -> Bool {
+        ["jpg", "jpeg", "png", "gif", "heic", "heif", "bmp", "tiff", "webp", "svg"].contains(ext)
+    }
+
+    private func isWebViewExtension(_ ext: String) -> Bool {
+        ["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx", "hwp", "hwpx",
+         "csv", "txt", "rtf", "html", "htm", "xml", "json"].contains(ext)
+    }
+
+    // MARK: - Helpers
 
     private func isFileDownloaded(_ url: URL) -> Bool {
         let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
@@ -184,7 +259,7 @@ struct FileViewerView: View {
     }
 }
 
-// MARK: - WebView로 문서 열기 (PDF, PPT, DOCX, HWP, Excel)
+// MARK: - WebView 문서 뷰어
 
 struct WebDocumentView: UIViewRepresentable {
     let url: URL
@@ -192,41 +267,58 @@ struct WebDocumentView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: config)
-        webView.scrollView.minimumZoomScale = 0.5
+        webView.scrollView.minimumZoomScale = 0.3
         webView.scrollView.maximumZoomScale = 5.0
         webView.scrollView.bouncesZoom = true
-        webView.load(URLRequest(url: url))
+
+        if url.isFileURL {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            webView.load(URLRequest(url: url))
+        }
+
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {}
 }
 
-// MARK: - 핀치 줌 가능한 이미지 뷰어
+// MARK: - 핀치 줌 이미지 뷰어
 
 struct ZoomableImageView: UIViewRepresentable {
     let image: UIImage
 
     func makeUIView(context: Context) -> UIScrollView {
         let scrollView = UIScrollView()
-        scrollView.minimumZoomScale = 0.5
+        scrollView.minimumZoomScale = 0.1
         scrollView.maximumZoomScale = 5.0
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.delegate = context.coordinator
+        scrollView.backgroundColor = .systemBackground
 
         let imageView = UIImageView(image: image)
         imageView.contentMode = .scaleAspectFit
         imageView.tag = 100
         scrollView.addSubview(imageView)
 
+        context.coordinator.imageView = imageView
+        context.coordinator.scrollView = scrollView
+
+        DispatchQueue.main.async {
+            context.coordinator.fitImage(in: scrollView)
+        }
+
         return scrollView
     }
 
     func updateUIView(_ scrollView: UIScrollView, context: Context) {
         guard let imageView = scrollView.viewWithTag(100) as? UIImageView else { return }
-        imageView.frame = scrollView.bounds
         imageView.image = image
+
+        DispatchQueue.main.async {
+            context.coordinator.fitImage(in: scrollView)
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -234,13 +326,61 @@ struct ZoomableImageView: UIViewRepresentable {
     }
 
     class Coordinator: NSObject, UIScrollViewDelegate {
+        weak var imageView: UIImageView?
+        weak var scrollView: UIScrollView?
+        private var lastBounds: CGRect = .zero
+
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-            scrollView.viewWithTag(100)
+            imageView
+        }
+
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            centerImage(in: scrollView)
+        }
+
+        func fitImage(in scrollView: UIScrollView) {
+            guard let imageView = imageView, let image = imageView.image else { return }
+            guard scrollView.bounds.width > 0, scrollView.bounds.height > 0 else { return }
+            guard scrollView.bounds != lastBounds else { return }
+            lastBounds = scrollView.bounds
+
+            let boundsSize = scrollView.bounds.size
+            let imageSize = image.size
+
+            let widthScale = boundsSize.width / imageSize.width
+            let heightScale = boundsSize.height / imageSize.height
+            let minScale = min(widthScale, heightScale)
+
+            scrollView.minimumZoomScale = minScale * 0.5
+            scrollView.maximumZoomScale = max(minScale * 5, 3.0)
+            scrollView.zoomScale = minScale
+
+            imageView.frame = CGRect(
+                x: 0, y: 0,
+                width: imageSize.width * minScale,
+                height: imageSize.height * minScale
+            )
+
+            scrollView.contentSize = imageView.frame.size
+            centerImage(in: scrollView)
+        }
+
+        private func centerImage(in scrollView: UIScrollView) {
+            guard let imageView = imageView else { return }
+            let boundsSize = scrollView.bounds.size
+            var frameToCenter = imageView.frame
+
+            frameToCenter.origin.x = frameToCenter.size.width < boundsSize.width
+                ? (boundsSize.width - frameToCenter.size.width) / 2 : 0
+            frameToCenter.origin.y = frameToCenter.size.height < boundsSize.height
+                ? (boundsSize.height - frameToCenter.size.height) / 2 : 0
+
+            imageView.frame = frameToCenter
         }
     }
 }
 
-// MARK: - QuickLook 폴백 (기타 파일)
+// MARK: - QuickLook 폴백
 
 struct QuickLookFallback: UIViewControllerRepresentable {
     let url: URL
