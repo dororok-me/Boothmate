@@ -187,21 +187,105 @@ class SpeechManager: ObservableObject {
         }
     
     private func restartRecording() {
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
-        recognitionRequest?.endAudio()
-        recognitionTask?.cancel()
-        recognitionRequest = nil
-        recognitionTask = nil
+            audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
+            recognitionRequest?.endAudio()
+            recognitionTask?.cancel()
+            recognitionRequest = nil
+            recognitionTask = nil
 
-        Task {
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            if self.isRecording {
-                self.startRecording()
+            // currentText가 있으면 저장
+            let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                let glossaryApplied = applyGlossary(to: trimmed)
+                allSubtitles.append(glossaryApplied)
+                subtitles.append(glossaryApplied)
+                if subtitles.count > maxDisplayLines {
+                    subtitles.removeFirst(subtitles.count - maxDisplayLines)
+                }
+                currentText = ""
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                if self.isRecording {
+                    self.startRecordingWithoutReset()
+                }
             }
         }
-    }
 
+    private func startRecordingWithoutReset() {
+            speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
+            guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else { return }
+
+            do {
+                let audioSession = AVAudioSession.sharedInstance()
+                try audioSession.setCategory(
+                    .record,
+                    mode: .measurement,
+                    options: [.duckOthers, .allowBluetooth]
+                )
+                try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+
+                if let preferredInput = audioSession.availableInputs?.first(where: { $0.portType == .usbAudio }) {
+                    try audioSession.setPreferredInput(preferredInput)
+                }
+
+                recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+                guard let recognitionRequest = recognitionRequest else { return }
+                recognitionRequest.shouldReportPartialResults = true
+
+                let inputNode = audioEngine.inputNode
+                let format = inputNode.outputFormat(forBus: 0)
+
+                inputNode.removeTap(onBus: 0)
+                inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+                    recognitionRequest.append(buffer)
+                }
+
+                audioEngine.prepare()
+                try audioEngine.start()
+
+                recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                    Task { @MainActor in
+                        guard let self = self else { return }
+
+                        if let result = result {
+                            let rawText = result.bestTranscription.formattedString
+
+                            if result.isFinal {
+                                self.currentText = self.applyGlossary(to: rawText)
+                            } else {
+                                if abs(rawText.count - self.currentText.count) > 2 || self.currentText.isEmpty {
+                                    self.currentText = rawText
+                                }
+                            }
+
+                            if result.isFinal {
+                                if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    self.allSubtitles.append(self.currentText)
+                                    self.subtitles.append(self.currentText)
+                                    if self.subtitles.count > self.maxDisplayLines {
+                                        self.subtitles.removeFirst(self.subtitles.count - self.maxDisplayLines)
+                                    }
+                                }
+                                self.currentText = ""
+                            }
+                        }
+
+                        if let error = error {
+                            print("음성 인식 오류: \(error.localizedDescription)")
+                            if self.isRecording {
+                                self.restartRecording()
+                            }
+                        }
+                    }
+                }
+            } catch {
+                print("리스타트 오류: \(error.localizedDescription)")
+            }
+        }
+    
     func clearSubtitles() {
         subtitles.removeAll()
         allSubtitles.removeAll()
