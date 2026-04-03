@@ -93,9 +93,7 @@ struct ContentView: View {
                                             )
                                         }
                                     }
-                                    .onEnded { _ in
-                                        leftVerticalSplitDragStart = nil
-                                    }
+                                    .onEnded { _ in leftVerticalSplitDragStart = nil }
                             )
 
                         MemoView()
@@ -123,9 +121,7 @@ struct ContentView: View {
                                         )
                                     }
                                 }
-                                .onEnded { _ in
-                                    horizontalSplitDragStart = nil
-                                }
+                                .onEnded { _ in horizontalSplitDragStart = nil }
                         )
 
                     // MARK: - 오른쪽: 파일뷰어 + 사전
@@ -153,9 +149,7 @@ struct ContentView: View {
                                             )
                                         }
                                     }
-                                    .onEnded { _ in
-                                        rightVerticalSplitDragStart = nil
-                                    }
+                                    .onEnded { _ in rightVerticalSplitDragStart = nil }
                             )
 
                         DictionaryView()
@@ -169,9 +163,7 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Done") {
-                        dismissKeyboard()
-                    }
+                    Button("Done") { dismissKeyboard() }
                 }
             }
             .onAppear {
@@ -183,59 +175,84 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showGlossary) {
                 GlossaryView(glossaryStore: glossaryStore)
-                
-                    .alert("언어 변경", isPresented: $showLanguageAlert) {
-                                    Button("확인", role: .cancel) {}
-                                } message: {
-                                    Text("녹음을 정지한 후 언어를 변경해 주세요")
-                                }
             }
 
             // MARK: - 플로팅 메뉴바
             floatingMenuBar
+
+            // 언어 경고 alert (ZStack 최상위, sheet와 분리)
+            Color.clear
+                .frame(width: 0, height: 0)
+                .alert("언어 변경", isPresented: $showLanguageAlert) {
+                    Button("확인", role: .cancel) {}
+                } message: {
+                    Text("녹음을 정지한 후 언어를 변경해 주세요")
+                }
         }
     }
 
     // MARK: - Floating Menu Bar
 
-        private var floatingMenuBar: some View {
-            let totalOffset = CGSize(
-                width: floatingBarOffset.width + floatingBarDragOffset.width,
-                height: floatingBarOffset.height + floatingBarDragOffset.height
-            )
+    private var floatingMenuBar: some View {
+        let totalOffset = CGSize(
+            width: floatingBarOffset.width + floatingBarDragOffset.width,
+            height: floatingBarOffset.height + floatingBarDragOffset.height
+        )
 
-            return HStack(spacing: 8) {
-                Group {
-                    VStack(spacing: 0) {
-                        Text("Boothmate")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.gray)
-                        Text("v1.0")
-                            .font(.system(size: 7, weight: .medium))
-                            .foregroundColor(.gray.opacity(0.6))
+        return HStack(spacing: 8) {
+            Group {
+                // Boothmate 로고
+                VStack(spacing: 0) {
+                    Text("Boothmate")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.gray)
+                    Text("v1.0")
+                        .font(.system(size: 7, weight: .medium))
+                        .foregroundColor(.gray.opacity(0.6))
+                }
+
+                // 1. Start/Stop
+                recordButton
+
+                // 2. 언어 토글
+                languageToggle
+
+                // 3. 지우기
+                Button {
+                    speechManager.clearSubtitles()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+
+                // 4. 글로서리
+                Button { showGlossary = true } label: {
+                    Image(systemName: "text.book.closed")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+
+                // 5. 확장 화살표
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        menuExpanded.toggle()
                     }
+                } label: {
+                    Image(systemName: menuExpanded ? "chevron.left" : "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.gray)
+                        .frame(width: 24, height: 32)
+                }
+                .buttonStyle(.plain)
 
-                    recordButton
-                    languageToggle
-
-                    Button {
-                        speechManager.clearSubtitles()
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button { showGlossary = true } label: {
-                        Image(systemName: "text.book.closed")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.plain)
-
+                // 확장 메뉴
+                if menuExpanded {
+                    // 6. 폰트 크기
                     Button { speechManager.cycleFontSize() } label: {
                         HStack(spacing: 0) {
                             Text("A").font(.system(size: 13, weight: .medium))
@@ -246,6 +263,7 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
 
+                    // 7. 설정
                     Button { showSettings = true } label: {
                         Image(systemName: "gearshape")
                             .font(.system(size: 15, weight: .semibold))
@@ -254,63 +272,64 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                .allowsHitTesting(!isDraggingBar)
-                .opacity(isDraggingBar ? 0.4 : 1.0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-            .offset(x: totalOffset.width, y: totalOffset.height)
-            .transaction { t in t.animation = nil }
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 8, coordinateSpace: .global)
-                    .onChanged { value in
-                        isDraggingBar = true
-                        floatingBarDragOffset = CGSize(
-                            width: value.translation.width,
-                            height: value.translation.height
-                        )
-                    }
-                    .onEnded { value in
-                        floatingBarOffset = CGSize(
-                            width: floatingBarOffset.width + value.translation.width,
-                            height: floatingBarOffset.height + value.translation.height
-                        )
-                        floatingBarDragOffset = .zero
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            isDraggingBar = false
-                        }
-                    }
-            )
+            .allowsHitTesting(!isDraggingBar)
+            .opacity(isDraggingBar ? 0.4 : 1.0)
         }
-    
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .offset(x: totalOffset.width, y: totalOffset.height)
+        .transaction { t in t.animation = nil }
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                .onChanged { value in
+                    isDraggingBar = true
+                    floatingBarDragOffset = CGSize(
+                        width: value.translation.width,
+                        height: value.translation.height
+                    )
+                }
+                .onEnded { value in
+                    floatingBarOffset = CGSize(
+                        width: floatingBarOffset.width + value.translation.width,
+                        height: floatingBarOffset.height + value.translation.height
+                    )
+                    floatingBarDragOffset = .zero
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        isDraggingBar = false
+                    }
+                }
+        )
+    }
+
     // MARK: - Language Toggle
 
     private var languageToggle: some View {
-            HStack(spacing: 0) {
-                ForEach(speechManager.languages, id: \.1) { name, code in
-                    Button {
-                        if speechManager.isRecording {
-                            showLanguageAlert = true
-                        } else {
-                            speechManager.selectedLanguage = code
-                        }
-                    } label: {
-                        Text(name)
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(width: 32, height: 28)
-                            .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
-                            .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
+        HStack(spacing: 0) {
+            ForEach(speechManager.languages, id: \.1) { name, code in
+                Button {
+                    if speechManager.isRecording {
+                        showLanguageAlert = true
+                    } else {
+                        speechManager.selectedLanguage = code
                     }
+                } label: {
+                    Text(name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 32, height: 28)
+                        .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
+                        .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
                 }
             }
-            .background(Color.gray.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .opacity(speechManager.isRecording ? 0.4 : 1.0)
         }
-    
+        .background(Color.gray.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .opacity(speechManager.isRecording ? 0.4 : 1.0)
+    }
+
     // MARK: - Record Button
 
     private var recordButton: some View {
@@ -376,44 +395,39 @@ struct ContentView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 16)
             }
-            .onAppear {
-                scrollToBottom(proxy)
-            }
-            .onChange(of: speechManager.currentText) { _ in
-                scrollToBottom(proxy)
-            }
-            .onChange(of: speechManager.subtitles.count) { _ in
-                scrollToBottom(proxy)
-            }
+            .onAppear { scrollToBottom(proxy) }
+            .onChange(of: speechManager.currentText) { _ in scrollToBottom(proxy) }
+            .onChange(of: speechManager.subtitles.count) { _ in scrollToBottom(proxy) }
         }
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        DispatchQueue.main.async {
-            proxy.scrollTo("bottomAnchor", anchor: .bottom)
-        }
+        proxy.scrollTo("bottomAnchor", anchor: .bottom)
     }
 
     // MARK: - Subtitle Block
-
-    private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
-        TappableText(
-            text: text,
-            fontSize: speechManager.fontSize,
-            textColor: speechManager.selectedTheme.textColor.opacity(opacity),
-            glossaryColor: speechManager.glossaryEnabled
-                ? speechManager.glossaryColor.color
-                : speechManager.selectedTheme.textColor.opacity(opacity),
-            lineSpacing: speechManager.lineSpacing,
-            glossaryStore: glossaryStore, // 👈 이 줄을 추가하세요
-            onTapWord: { word in
-                NotificationCenter.default.post(name: .searchDictionary, object: word)
+        private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
+            TappableText(
+                text: text,
+                fontSize: speechManager.fontSize,
+                textColor: speechManager.selectedTheme.textColor.opacity(opacity),
+                // 순서 변경: glossaryColor와 lineSpacing을 먼저 씁니다.
+                glossaryColor: speechManager.glossaryEnabled
+                    ? speechManager.glossaryColor.color
+                    : speechManager.selectedTheme.textColor.opacity(opacity),
+                lineSpacing: speechManager.lineSpacing,
+                glossaryStore: glossaryStore  // glossaryStore를 뒤로 보냈습니다.
+            ) { word in
+                NotificationCenter.default.post(
+                    name: .searchDictionary,
+                    object: word,
+                    userInfo: ["language": speechManager.selectedLanguage]
+                )
             }
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, 20 + leftDangerInset)
-        .padding(.trailing, 20)
-    }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 20 + leftDangerInset)
+            .padding(.trailing, 20)
+        }
 
     // MARK: - Drag Handles
 
