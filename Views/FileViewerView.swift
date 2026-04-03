@@ -172,6 +172,7 @@ struct FileViewerView: View {
                 fileKey = UUID()
                 return
             }
+            
             // 실패 시 복사 후 재시도
             if let localURL = copyToTemp(url) {
                 if let data = try? Data(contentsOf: localURL),
@@ -183,6 +184,7 @@ struct FileViewerView: View {
                     return
                 }
             }
+            
             url.stopAccessingSecurityScopedResource()
             showError("이미지를 열 수 없습니다.")
             return

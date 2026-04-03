@@ -56,6 +56,7 @@ struct FlowLayout: Layout {
         cache: inout ()
     ) -> CGSize {
         let maxWidth = proposal.width ?? 0
+        
         guard maxWidth > 0 else {
             let totalWidth = subviews.reduce(CGFloat.zero) { partial, subview in
                 partial + subview.sizeThatFits(.unspecified).width + spacing
@@ -70,11 +71,13 @@ struct FlowLayout: Layout {
 
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
+            
             if x + size.width > maxWidth, x > 0 {
                 x = 0
                 y += rowHeight + spacing
                 rowHeight = 0
             }
+            
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
@@ -94,15 +97,18 @@ struct FlowLayout: Layout {
 
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
+            
             if x + size.width > bounds.maxX, x > bounds.minX {
                 x = bounds.minX
                 y += rowHeight + spacing
                 rowHeight = 0
             }
+            
             subview.place(
                 at: CGPoint(x: x, y: y),
                 proposal: ProposedViewSize(width: size.width, height: size.height)
             )
+            
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }

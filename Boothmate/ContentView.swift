@@ -212,96 +212,96 @@ struct ContentView: View {
     // MARK: - Floating Menu Bar
 
     private var floatingMenuBar: some View {
-        let totalOffset = CGSize(
-            width: floatingBarOffset.width + floatingBarDragOffset.width,
-            height: floatingBarOffset.height + floatingBarDragOffset.height
-        )
+            let totalOffset = CGSize(
+                width: floatingBarOffset.width + floatingBarDragOffset.width,
+                height: floatingBarOffset.height + floatingBarDragOffset.height
+            )
 
-        return HStack(spacing: 8) {
-            Group {
-                // Boothmate 로고
-                VStack(spacing: 0) {
-                    Text("Boothmate")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.gray)
-                    Text("v1.0")
-                        .font(.system(size: 7, weight: .medium))
-                        .foregroundColor(.gray.opacity(0.6))
-                }
-
-                // 1. Start/Stop
-                recordButton
-
-                // 2. 언어 토글
-                languageToggle
-
-                // 3. 지우기
-                Button {
-                    speechManager.clearSubtitles()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-
-                // 4. 글로서리
-                Button { showGlossary = true } label: {
-                    Image(systemName: "text.book.closed")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-
-                // 5. 확장 화살표
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        menuExpanded.toggle()
+            return HStack(spacing: 8) {
+                Group {
+                    // Boothmate 로고
+                    VStack(spacing: 0) {
+                        Text("Boothmate")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.gray)
+                        Text("v1.0")
+                            .font(.system(size: 7, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.6))
                     }
-                } label: {
-                    Image(systemName: menuExpanded ? "chevron.left" : "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.gray)
-                        .frame(width: 24, height: 32)
-                }
-                .buttonStyle(.plain)
 
-                // 확장 메뉴
-                if menuExpanded {
-                    // 6. 폰트 크기
-                    Button { speechManager.cycleFontSize() } label: {
-                        HStack(spacing: 0) {
-                            Text("A").font(.system(size: 13, weight: .medium))
-                            Text("A").font(.system(size: 20, weight: .bold))
+                    // 1. Start/Stop
+                    recordButton
+
+                    // 2. 언어 토글
+                    languageToggle
+
+                    // 3. 확장 화살표 (언어 토글 바로 오른쪽으로 이동 및 색상 강화)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            menuExpanded.toggle()
                         }
-                        .foregroundColor(.primary)
-                        .frame(width: 38, height: 32)
+                    } label: {
+                        Image(systemName: menuExpanded ? "chevron.left" : "chevron.right")
+                            .font(.system(size: 14, weight: .bold)) // 두껍게 변경
+                            .foregroundColor(.primary) // 더 진한 색상(Primary)으로 변경
+                            .frame(width: 24, height: 32)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
 
-                    // 7. 설정
-                    Button { showSettings = true } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 15, weight: .semibold))
+                    // --- 여기서부터는 확장(menuExpanded)되어야 보이는 메뉴 ---
+                    if menuExpanded {
+                        // 4. 지우기 (확장 메뉴 안으로 이동)
+                        Button {
+                            speechManager.clearSubtitles()
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.primary)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+
+                        // 5. 글로서리 (확장 메뉴 안으로 이동)
+                        Button { showGlossary = true } label: {
+                            Image(systemName: "text.book.closed")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.primary)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+
+                        // 6. 폰트 크기
+                        Button { speechManager.cycleFontSize() } label: {
+                            HStack(spacing: 0) {
+                                Text("A").font(.system(size: 13, weight: .medium))
+                                Text("A").font(.system(size: 20, weight: .bold))
+                            }
                             .foregroundColor(.primary)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 38, height: 32)
+                        }
+                        .buttonStyle(.plain)
+
+                        // 7. 설정
+                        Button { showSettings = true } label: {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.primary)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .allowsHitTesting(!isDraggingBar)
+                .opacity(isDraggingBar ? 0.4 : 1.0)
             }
-            .allowsHitTesting(!isDraggingBar)
-            .opacity(isDraggingBar ? 0.4 : 1.0)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-        .offset(x: totalOffset.width, y: totalOffset.height)
-        .transaction { t in t.animation = nil }
-        .highPriorityGesture(
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .offset(x: totalOffset.width, y: totalOffset.height)
+            .transaction { t in t.animation = nil }        .highPriorityGesture(
             DragGesture(minimumDistance: 8, coordinateSpace: .global)
                 .onChanged { value in
                     isDraggingBar = true

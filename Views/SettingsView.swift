@@ -10,14 +10,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                            languageSection
-                            fontSection
-                            themeSection
-                            glossarySection
-                            exportSection
-                            aboutSection
-                        }
-            
+                languageSection
+                fontSection
+                themeSection
+                glossarySection
+                exportSection
+                aboutSection
+            }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -51,31 +50,31 @@ struct SettingsView: View {
     }
 
     private var fontSection: some View {
-            Section("Font Size & Line Spacing") {
-                HStack {
-                    Text("Font Size")
-                    Spacer()
-                    Text("\(Int(speechManager.fontSize))")
-                        .foregroundColor(.secondary)
-                }
-
-                Slider(value: $speechManager.fontSize, in: 16...36, step: 1)
-
-                HStack {
-                    Text("Line Spacing")
-                    Spacer()
-                    Text("\(Int(speechManager.lineSpacing))")
-                        .foregroundColor(.secondary)
-                }
-
-                Slider(value: $speechManager.lineSpacing, in: 0...30, step: 2)
-
-                Text("Preview Text\nSecond line here")
-                    .font(.system(size: speechManager.fontSize))
-                    .lineSpacing(speechManager.lineSpacing)
-                    .padding(.vertical, 6)
+        Section("Font Size & Line Spacing") {
+            HStack {
+                Text("Font Size")
+                Spacer()
+                Text("\(Int(speechManager.fontSize))")
+                    .foregroundColor(.secondary)
             }
+
+            Slider(value: $speechManager.fontSize, in: 16...36, step: 1)
+
+            HStack {
+                Text("Line Spacing")
+                Spacer()
+                Text("\(Int(speechManager.lineSpacing))")
+                    .foregroundColor(.secondary)
+            }
+
+            Slider(value: $speechManager.lineSpacing, in: 0...30, step: 2)
+
+            Text("Preview Text\nSecond line here")
+                .font(.system(size: speechManager.fontSize))
+                .lineSpacing(speechManager.lineSpacing)
+                .padding(.vertical, 6)
         }
+    }
 
     private var themeSection: some View {
         Section("Theme") {
@@ -133,6 +132,7 @@ struct SettingsView: View {
                                     Circle()
                                         .fill(color.color)
                                         .frame(width: 32, height: 32)
+                                    
                                     if speechManager.glossaryColor == color {
                                         Circle()
                                             .stroke(Color.primary, lineWidth: 2.5)
@@ -173,20 +173,20 @@ struct SettingsView: View {
     }
 
     private var aboutSection: some View {
-            Section {
-                VStack(spacing: 4) {
-                    Text("Boothmate v1.0")
-                        .font(.footnote.bold())
-                        .foregroundColor(.secondary)
-                    Text("dororok studio")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .listRowBackground(Color.clear)
+        Section {
+            VStack(spacing: 4) {
+                Text("Boothmate v1.0")
+                    .font(.footnote.bold())
+                    .foregroundColor(.secondary)
+                Text("dororok studio")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
         }
-    
+    }
+
     private func shareSubtitles() {
         let text = speechManager.exportAllSubtitles()
         guard !text.isEmpty else { return }

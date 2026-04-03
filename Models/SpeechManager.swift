@@ -6,9 +6,9 @@ import Combine
 
 @MainActor
 class SpeechManager: ObservableObject {
-
+    
     // MARK: - Published Properties
-
+    
     @Published var subtitles: [String] = []
     @Published var currentText: String = ""
     @Published var isRecording: Bool = false
@@ -20,62 +20,62 @@ class SpeechManager: ObservableObject {
     @Published var elapsedSeconds: Int = 0
     @Published var glossaryEnabled: Bool = true
     @Published var glossaryColor: GlossaryColor = .orange
-
+    
     // MARK: - Storage
-
+    
     var allSubtitles: [String] = []
     weak var glossaryStore: GlossaryStore?
-
+    
     // MARK: - Private Properties
-
+    
     private let maxDisplayLines = 5
     private let fontSizes: [CGFloat] = [16, 22, 28, 36]
     private var fontSizeIndex: Int = 1
     private var timer: Timer?
     private var sessionSeconds: Int = 0
     private var isRestarting = false
-
+    
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
-
+    
     // MARK: - Constants
-
+    
     let languages = [
         ("KR", "ko-KR"),
         ("EN", "en-US"),
         ("JP", "ja-JP"),
         ("CN", "zh-CN")
     ]
-
+    
     // MARK: - Font Size
-
+    
     func cycleFontSize() {
         fontSizeIndex = (fontSizeIndex + 1) % fontSizes.count
         fontSize = fontSizes[fontSizeIndex]
     }
-
+    
     // MARK: - Permissions
-
+    
     func requestPermissions() {
         Task {
             SFSpeechRecognizer.requestAuthorization { _ in }
             AVAudioApplication.requestRecordPermission { _ in }
         }
     }
-
+    
     // MARK: - Start Recording
-
+    
     func startRecording() {
         stopRecording()
-
+        
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
             print("현재 선택된 언어의 음성 인식을 사용할 수 없습니다.")
             return
         }
-
+        
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(
@@ -84,27 +84,27 @@ class SpeechManager: ObservableObject {
                 options: [.duckOthers, .allowBluetooth]
             )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-
+            
             if let preferredInput = audioSession.availableInputs?.first(where: { $0.portType == .usbAudio }) {
                 try audioSession.setPreferredInput(preferredInput)
             }
-
+            
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             guard let recognitionRequest = recognitionRequest else { return }
             recognitionRequest.shouldReportPartialResults = true
-
+            
             let inputNode = audioEngine.inputNode
             let format = inputNode.outputFormat(forBus: 0)
-
+            
             inputNode.removeTap(onBus: 0)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
-
+            
             audioEngine.prepare()
             try audioEngine.start()
             isRecording = true
-
+            
             // 타이머 시작
             elapsedSeconds = 0
             sessionSeconds = 0
@@ -113,7 +113,7 @@ class SpeechManager: ObservableObject {
                     guard let self = self else { return }
                     self.elapsedSeconds += 1
                     self.sessionSeconds += 1
-
+                    
                     // 30초마다 음성인식 자동 리스타트 (느려짐 방지)
                     if self.sessionSeconds >= 420 && self.isRecording && !self.isPaused && !self.isRestarting {
                         self.restartRecording()
@@ -122,14 +122,14 @@ class SpeechManager: ObservableObject {
             }
             RunLoop.main.add(newTimer, forMode: .common)
             timer = newTimer
-
+            
             recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 Task { @MainActor in
                     guard let self = self else { return }
-
+                    
                     if let result = result {
                         let rawText = result.bestTranscription.formattedString
-
+                        
                         if result.isFinal {
                             self.currentText = self.applyGlossary(to: rawText)
                         } else {
@@ -137,7 +137,7 @@ class SpeechManager: ObservableObject {
                                 self.currentText = rawText
                             }
                         }
-
+                        
                         if result.isFinal {
                             if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 self.allSubtitles.append(self.currentText)
@@ -149,10 +149,9 @@ class SpeechManager: ObservableObject {
                             self.currentText = ""
                         }
                     }
-
+                    
                     if let error = error {
                         print("음성 인식 오류: \(error.localizedDescription)")
-                        // 타이머 리스타트와 중복 방지: 에러 시에는 리스타트 안 함
                     }
                 }
             }
@@ -160,9 +159,9 @@ class SpeechManager: ObservableObject {
             print("녹음 시작 오류: \(error.localizedDescription)")
         }
     }
-
+    
     // MARK: - Stop Recording
-
+    
     func stopRecording() {
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
@@ -175,7 +174,7 @@ class SpeechManager: ObservableObject {
         isRestarting = false
         timer?.invalidate()
         timer = nil
-
+        
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
             allSubtitles.append(currentText)
@@ -186,9 +185,9 @@ class SpeechManager: ObservableObject {
         }
         currentText = ""
     }
-
+    
     // MARK: - Pause / Resume
-
+    
     func pauseRecording() {
         guard isRecording, !isPaused else { return }
         audioEngine.pause()
@@ -196,7 +195,7 @@ class SpeechManager: ObservableObject {
         timer?.invalidate()
         timer = nil
     }
-
+    
     func resumeRecording() {
         guard isRecording, isPaused else { return }
         try? audioEngine.start()
@@ -207,7 +206,7 @@ class SpeechManager: ObservableObject {
                 guard let self = self else { return }
                 self.elapsedSeconds += 1
                 self.sessionSeconds += 1
-
+                
                 if self.sessionSeconds >= 420 && self.isRecording && !self.isPaused && !self.isRestarting {
                     self.restartRecording()
                 }
@@ -216,20 +215,20 @@ class SpeechManager: ObservableObject {
         RunLoop.main.add(newTimer, forMode: .common)
         timer = newTimer
     }
-
+    
     // MARK: - Restart (30초마다 자동)
-
+    
     private func restartRecording() {
         guard !isRestarting else { return }
         isRestarting = true
-
+        
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionRequest = nil
         recognitionTask = nil
-
+        
         // 인식 중이던 텍스트 저장
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
@@ -241,7 +240,7 @@ class SpeechManager: ObservableObject {
             }
         }
         currentText = ""
-
+        
         // 즉시 재시작 (0.2초 대기)
         Task {
             try? await Task.sleep(nanoseconds: 200_000_000)
@@ -255,13 +254,13 @@ class SpeechManager: ObservableObject {
             }
         }
     }
-
+    
     // MARK: - Start Without Reset (리스타트용)
-
+    
     private func startRecordingWithoutReset() {
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else { return }
-
+        
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(
@@ -270,33 +269,33 @@ class SpeechManager: ObservableObject {
                 options: [.duckOthers, .allowBluetooth]
             )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-
+            
             if let preferredInput = audioSession.availableInputs?.first(where: { $0.portType == .usbAudio }) {
                 try audioSession.setPreferredInput(preferredInput)
             }
-
+            
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             guard let recognitionRequest = recognitionRequest else { return }
             recognitionRequest.shouldReportPartialResults = true
-
+            
             let inputNode = audioEngine.inputNode
             let format = inputNode.outputFormat(forBus: 0)
-
+            
             inputNode.removeTap(onBus: 0)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
-
+            
             audioEngine.prepare()
             try audioEngine.start()
-
+            
             recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 Task { @MainActor in
                     guard let self = self else { return }
-
+                    
                     if let result = result {
                         let rawText = result.bestTranscription.formattedString
-
+                        
                         if result.isFinal {
                             self.currentText = self.applyGlossary(to: rawText)
                         } else {
@@ -304,7 +303,7 @@ class SpeechManager: ObservableObject {
                                 self.currentText = rawText
                             }
                         }
-
+                        
                         if result.isFinal {
                             if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 self.allSubtitles.append(self.currentText)
@@ -316,10 +315,9 @@ class SpeechManager: ObservableObject {
                             self.currentText = ""
                         }
                     }
-
+                    
                     if let error = error {
                         print("음성 인식 오류: \(error.localizedDescription)")
-                        // 타이머 리스타트와 중복 방지: 에러 시에는 리스타트 안 함
                     }
                 }
             }
@@ -327,44 +325,44 @@ class SpeechManager: ObservableObject {
             print("리스타트 오류: \(error.localizedDescription)")
         }
     }
-
+    
     // MARK: - Subtitles Management
-
+    
     func clearSubtitles() {
         subtitles.removeAll()
         allSubtitles.removeAll()
         currentText = ""
     }
-
+    
     func exportAllSubtitles() -> String {
         return allSubtitles.joined(separator: "\n")
     }
-
+    
     // MARK: - Glossary
-
+    
     private func applyGlossary(to text: String) -> String {
         guard glossaryEnabled else { return text }
         guard let glossaryStore = glossaryStore else { return text }
         guard !glossaryStore.entries.isEmpty else { return text }
-
+        
         var output = text
-
+        
         // 1단계: 긴 구문부터 먼저 매칭
         let sortedEntries = glossaryStore.entries.sorted {
             $0.source.count > $1.source.count
         }
-
+        
         for entry in sortedEntries {
             let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
             let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !source.isEmpty, !target.isEmpty else { continue }
-
+            
             let annotatedST = "\(source)(\(target))"
             let annotatedTS = "\(target)(\(source))"
-
+            
             if output.localizedCaseInsensitiveContains(annotatedST) ||
-               output.localizedCaseInsensitiveContains(annotatedTS) { continue }
-
+                output.localizedCaseInsensitiveContains(annotatedTS) { continue }
+            
             if source.contains(" ") {
                 if output.localizedCaseInsensitiveContains(source) {
                     output = output.replacingOccurrences(of: source, with: annotatedST, options: .caseInsensitive)
@@ -373,31 +371,31 @@ class SpeechManager: ObservableObject {
                 }
             }
         }
-
+        
         // 2단계: 단일 단어 매칭
         let words = output.components(separatedBy: " ")
         var result: [String] = []
-
+        
         for word in words {
             if word.contains("(") && word.contains(")") {
                 result.append(word)
                 continue
             }
-
+            
             let leading = String(word.prefix(while: { $0.isPunctuation || $0.isWhitespace }))
             let trailing = String(word.reversed().prefix(while: { $0.isPunctuation || $0.isWhitespace }).reversed())
             let startIdx = word.index(word.startIndex, offsetBy: leading.count)
             let endIdx = word.index(word.endIndex, offsetBy: -trailing.count)
             let clean = startIdx < endIdx ? String(word[startIdx..<endIdx]) : word
-
+            
             var matched = false
-
+            
             for entry in sortedEntries {
                 let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
                 let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !source.isEmpty, !target.isEmpty else { continue }
                 guard !source.contains(" ") else { continue }
-
+                
                 if clean.localizedCaseInsensitiveCompare(source) == .orderedSame {
                     result.append("\(leading)\(clean)(\(target))\(trailing)")
                     matched = true
@@ -408,12 +406,12 @@ class SpeechManager: ObservableObject {
                     break
                 }
             }
-
+            
             if !matched {
                 result.append(word)
             }
         }
-
+        
         return result.joined(separator: " ")
     }
 }
@@ -426,9 +424,9 @@ enum GlossaryColor: String, CaseIterable, Identifiable {
     case green = "Green"
     case red = "Red"
     case purple = "Purple"
-
+    
     var id: String { rawValue }
-
+    
     var label: String {
         switch self {
         case .orange: return "주황"
@@ -438,7 +436,7 @@ enum GlossaryColor: String, CaseIterable, Identifiable {
         case .purple: return "보라"
         }
     }
-
+    
     var color: Color {
         switch self {
         case .orange: return .orange
@@ -456,9 +454,9 @@ enum SubtitleTheme: String, CaseIterable, Identifiable {
     case normal = "Normal View"
     case night = "Night View"
     case legal = "Legal Pad"
-
+    
     var id: String { rawValue }
-
+    
     var backgroundColor: Color {
         switch self {
         case .normal: return .white
@@ -466,7 +464,7 @@ enum SubtitleTheme: String, CaseIterable, Identifiable {
         case .legal: return Color(red: 1.0, green: 1.0, blue: 0.8)
         }
     }
-
+    
     var textColor: Color {
         switch self {
         case .normal: return .black
@@ -474,7 +472,7 @@ enum SubtitleTheme: String, CaseIterable, Identifiable {
         case .legal: return Color(red: 0.0, green: 0.0, blue: 0.5)
         }
     }
-
+    
     var iconColor: Color {
         switch self {
         case .normal: return .black
@@ -482,7 +480,7 @@ enum SubtitleTheme: String, CaseIterable, Identifiable {
         case .legal: return Color(red: 0.0, green: 0.0, blue: 0.5)
         }
     }
-
+    
     var lineColor: Color {
         Color.red.opacity(0.3)
     }

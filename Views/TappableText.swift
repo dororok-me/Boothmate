@@ -50,13 +50,17 @@ struct TappableText: UIViewRepresentable {
         var cleanedText = text
         let bracketPattern = "\\s?\\([가-힣A-Za-z\\s\\.,?!]+\\)"
         if let regex = try? NSRegularExpression(pattern: bracketPattern) {
-            cleanedText = regex.stringByReplacingMatches(in: cleanedText, range: NSRange(cleanedText.startIndex..., in: cleanedText), withTemplate: "")
+            cleanedText = regex.stringByReplacingMatches(
+                in: cleanedText,
+                range: NSRange(cleanedText.startIndex..., in: cleanedText),
+                withTemplate: ""
+            )
         }
 
         var workingText = cleanedText
         var replacements: [String: (display: String, translation: String)] = [:]
         
-        // 3. 매칭 대상 데이터 준비 (Source, Target, Synonyms 모두 포함)
+        // 3. 매칭 대상 데이터 준비
         struct MatchPair {
             let search: String
             let result: String
@@ -64,11 +68,8 @@ struct TappableText: UIViewRepresentable {
         
         var allPairs: [MatchPair] = []
         for entry in glossaryStore.entries {
-            // 원문 -> 번역어
             allPairs.append(MatchPair(search: entry.source, result: entry.target))
-            // 번역어 -> 원문 (양방향)
             allPairs.append(MatchPair(search: entry.target, result: entry.source))
-            // 유의어들 -> 번역어
             for syn in entry.synonyms {
                 if !syn.isEmpty {
                     allPairs.append(MatchPair(search: syn, result: entry.target))
@@ -80,11 +81,10 @@ struct TappableText: UIViewRepresentable {
         let sortedPairs = allPairs.sorted { $0.search.count > $1.search.count }
 
         for (index, pair) in sortedPairs.enumerated() {
-            // 띄어쓰기 무시 패턴 생성
             let strippedSource = pair.search.replacingOccurrences(of: " ", with: "")
             let flexiblePattern = strippedSource.map { NSRegularExpression.escapedPattern(for: String($0)) }.joined(separator: "\\s?")
             
-            // 조사 허용 및 경계 체크 (영문자/숫자가 뒤에 붙는 경우만 제외)
+            // 조사 허용 및 경계 체크
             let pattern = "(?<![A-Za-z0-9가-힣])\(flexiblePattern)(?![A-Za-z0-9])"
             
             guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { continue }
@@ -92,7 +92,6 @@ struct TappableText: UIViewRepresentable {
             let placeholder = "__GLO_\(index)__"
             let range = NSRange(workingText.startIndex..., in: workingText)
             
-            // 문장에서 실제 발견된 모양을 캡처하여 보존
             if let match = regex.firstMatch(in: workingText, range: range) {
                 let originalInText = (workingText as NSString).substring(with: match.range)
                 workingText = regex.stringByReplacingMatches(in: workingText, range: range, withTemplate: placeholder)
@@ -115,7 +114,6 @@ struct TappableText: UIViewRepresentable {
                 
                 let placeholder = nsWorkingText.substring(with: matchRange)
                 if let data = replacements[placeholder] {
-                    // 원문과 괄호 번역어 모두 Normal체(Medium) 적용
                     let coloredWord = NSMutableAttributedString(string: data.display, attributes: glossaryAttrs)
                     let translation = NSAttributedString(string: "(\(data.translation))", attributes: glossaryAttrs)
                     coloredWord.append(translation)
@@ -147,10 +145,12 @@ struct TappableText: UIViewRepresentable {
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let label = gesture.view as? UILabel, let attributedText = label.attributedText else { return }
+            
             let point = gesture.location(in: label)
             let textStorage = NSTextStorage(attributedString: attributedText)
             let layoutManager = NSLayoutManager()
             let textContainer = NSTextContainer(size: label.bounds.size)
+            
             textContainer.lineFragmentPadding = 0
             textContainer.maximumNumberOfLines = label.numberOfLines
             textContainer.lineBreakMode = label.lineBreakMode
@@ -182,19 +182,17 @@ struct TappableText: UIViewRepresentable {
                              .replacingOccurrences(of: ")", with: "")
 
             if !cleaned.isEmpty {
-                            // 탭한 단어 하이라이트
-                            let highlightRange = NSRange(location: wordStart, length: wordEnd - wordStart)
-                            let highlighted = NSMutableAttributedString(attributedString: attributedText)
-                            highlighted.addAttribute(.backgroundColor, value: UIColor.systemYellow.withAlphaComponent(0.4), range: highlightRange)
-                            label.attributedText = highlighted
+                let highlightRange = NSRange(location: wordStart, length: wordEnd - wordStart)
+                let highlighted = NSMutableAttributedString(attributedString: attributedText)
+                highlighted.addAttribute(.backgroundColor, value: UIColor.systemYellow.withAlphaComponent(0.4), range: highlightRange)
+                label.attributedText = highlighted
 
-                            // 0.6초 후 원래대로
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                                label.attributedText = attributedText
-                            }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    label.attributedText = attributedText
+                }
 
-                            onTapWord(cleaned)
-                        }
+                onTapWord(cleaned)
+            }
         }
     }
 }
