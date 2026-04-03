@@ -115,7 +115,7 @@ class SpeechManager: ObservableObject {
                     self.sessionSeconds += 1
 
                     // 30초마다 음성인식 자동 리스타트 (느려짐 방지)
-                    if self.sessionSeconds >= 30 && self.isRecording && !self.isPaused && !self.isRestarting {
+                    if self.sessionSeconds >= 420 && self.isRecording && !self.isPaused && !self.isRestarting {
                         self.restartRecording()
                     }
                 }
@@ -208,7 +208,7 @@ class SpeechManager: ObservableObject {
                 self.elapsedSeconds += 1
                 self.sessionSeconds += 1
 
-                if self.sessionSeconds >= 30 && self.isRecording && !self.isPaused && !self.isRestarting {
+                if self.sessionSeconds >= 420 && self.isRecording && !self.isPaused && !self.isRestarting {
                     self.restartRecording()
                 }
             }

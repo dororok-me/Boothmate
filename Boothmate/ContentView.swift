@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var showGlossary = false
     @State private var menuExpanded = false
     @State private var isDraggingBar = false
+    @State private var showLanguageAlert = false
 
     @State private var floatingBarOffset: CGSize = .zero
     @State private var floatingBarDragOffset: CGSize = .zero
@@ -182,6 +183,12 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showGlossary) {
                 GlossaryView(glossaryStore: glossaryStore)
+                
+                    .alert("언어 변경", isPresented: $showLanguageAlert) {
+                                    Button("확인", role: .cancel) {}
+                                } message: {
+                                    Text("녹음을 정지한 후 언어를 변경해 주세요")
+                                }
             }
 
             // MARK: - 플로팅 메뉴바
@@ -191,168 +198,119 @@ struct ContentView: View {
 
     // MARK: - Floating Menu Bar
 
-    private var floatingMenuBar: some View {
-        let totalOffset = CGSize(
-            width: floatingBarOffset.width + floatingBarDragOffset.width,
-            height: floatingBarOffset.height + floatingBarDragOffset.height
-        )
+        private var floatingMenuBar: some View {
+            let totalOffset = CGSize(
+                width: floatingBarOffset.width + floatingBarDragOffset.width,
+                height: floatingBarOffset.height + floatingBarDragOffset.height
+            )
 
-        return HStack(spacing: 8) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.gray)
-                .frame(width: 28, height: 32)
-                .padding(.leading, 2)
-
-                            Group {
-                            VStack(spacing: 0) {
-                                Text("Boothmate")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(.gray)
-                                Text("v1.0")
-                                    .font(.system(size: 7, weight: .medium))
-                                    .foregroundColor(.gray.opacity(0.6))
-                            }
-
-                            recordButton
-
-            Button {
-                            if speechManager.isPaused {
-                                speechManager.resumeRecording()
-                            } else {
-                                speechManager.pauseRecording()
-                            }
-                        } label: {
-                            Image(systemName: speechManager.isPaused ? "play.fill" : "pause.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(speechManager.isPaused ? .orange : .primary)
-                                .frame(width: 32, height: 32)
-                        }
-                        .buttonStyle(.plain)
-                        .opacity(speechManager.isRecording ? 1 : 0.3)
-                        .disabled(!speechManager.isRecording)
-
-            languageToggle
-
-            Button(action: { pickFileFromFloating() }) {
-                Image(systemName: "folder.badge.plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
-                    .frame(width: 32, height: 32)
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    menuExpanded.toggle()
-                }
-            } label: {
-                Image(systemName: menuExpanded ? "chevron.left" : "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.gray)
-                    .frame(width: 24, height: 32)
-            }
-            .buttonStyle(.plain)
-
-            if menuExpanded {
-                Button {
-                    speechManager.clearSubtitles()
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    showGlossary = true
-                } label: {
-                    Image(systemName: "text.book.closed")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    speechManager.cycleFontSize()
-                } label: {
-                    HStack(spacing: 0) {
-                        Text("A").font(.system(size: 13, weight: .medium))
-                        Text("A").font(.system(size: 20, weight: .bold))
+            return HStack(spacing: 8) {
+                Group {
+                    VStack(spacing: 0) {
+                        Text("Boothmate")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.gray)
+                        Text("v1.0")
+                            .font(.system(size: 7, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.6))
                     }
-                    .foregroundColor(.primary)
-                    .frame(width: 38, height: 32)
-                }
-                .buttonStyle(.plain)
 
-                Button {
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 15, weight: .semibold))
+                    recordButton
+                    languageToggle
+
+                    Button {
+                        speechManager.clearSubtitles()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button { showGlossary = true } label: {
+                        Image(systemName: "text.book.closed")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button { speechManager.cycleFontSize() } label: {
+                        HStack(spacing: 0) {
+                            Text("A").font(.system(size: 13, weight: .medium))
+                            Text("A").font(.system(size: 20, weight: .bold))
+                        }
                         .foregroundColor(.primary)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-                            }
-                            }
-                            .allowsHitTesting(!isDraggingBar)
-                            .opacity(isDraggingBar ? 0.4 : 1.0)
-                        }
-                        .padding(.leading, 6)
-        .padding(.trailing, 12)
-        .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-        .offset(x: totalOffset.width, y: totalOffset.height)
-        .transaction { t in
-            t.animation = nil
-        }
-        .highPriorityGesture(
-                    DragGesture(minimumDistance: 8, coordinateSpace: .global)
-                        .onChanged { value in
-                            isDraggingBar = true
-                            floatingBarDragOffset = CGSize(
-                                width: value.translation.width,
-                                height: value.translation.height
-                            )
-                        }
-                        .onEnded { value in
-                            floatingBarOffset = CGSize(
-                                width: floatingBarOffset.width + value.translation.width,
-                                height: floatingBarOffset.height + value.translation.height
-                            )
-                            floatingBarDragOffset = .zero
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                isDraggingBar = false
-                            }
-                        }
-                )
-    }
+                        .frame(width: 38, height: 32)
+                    }
+                    .buttonStyle(.plain)
 
+                    Button { showSettings = true } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .allowsHitTesting(!isDraggingBar)
+                .opacity(isDraggingBar ? 0.4 : 1.0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .offset(x: totalOffset.width, y: totalOffset.height)
+            .transaction { t in t.animation = nil }
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                    .onChanged { value in
+                        isDraggingBar = true
+                        floatingBarDragOffset = CGSize(
+                            width: value.translation.width,
+                            height: value.translation.height
+                        )
+                    }
+                    .onEnded { value in
+                        floatingBarOffset = CGSize(
+                            width: floatingBarOffset.width + value.translation.width,
+                            height: floatingBarOffset.height + value.translation.height
+                        )
+                        floatingBarDragOffset = .zero
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            isDraggingBar = false
+                        }
+                    }
+            )
+        }
+    
     // MARK: - Language Toggle
 
     private var languageToggle: some View {
-        HStack(spacing: 0) {
-            ForEach(speechManager.languages, id: \.1) { name, code in
-                Button {
-                    speechManager.selectedLanguage = code
-                } label: {
-                    Text(name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 32, height: 28)
-                        .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
-                        .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
+            HStack(spacing: 0) {
+                ForEach(speechManager.languages, id: \.1) { name, code in
+                    Button {
+                        if speechManager.isRecording {
+                            showLanguageAlert = true
+                        } else {
+                            speechManager.selectedLanguage = code
+                        }
+                    } label: {
+                        Text(name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .frame(width: 32, height: 28)
+                            .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
+                            .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
+                    }
                 }
             }
+            .background(Color.gray.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .opacity(speechManager.isRecording ? 0.4 : 1.0)
         }
-        .background(Color.gray.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
+    
     // MARK: - Record Button
 
     private var recordButton: some View {
