@@ -126,24 +126,25 @@ struct ContentView: View {
 
                     // MARK: - 오른쪽: 파일뷰어 + 사전
                     VStack(spacing: 0) {
-                        ZStack(alignment: .bottomLeading) { // 좌측 하단 정렬
+                        ZStack(alignment: .bottomLeading) {
                             FileViewerView()
                                 .frame(width: rightWidth, height: rightTopHeight)
                                 .background(Color(.systemBackground))
 
-                            // 추가된 파일 열기(+) 버튼
+                            // 연한 회색 스타일의 파일 추가 버튼
                             Button {
                                 pickFileFromFloating()
                             } label: {
                                 Image(systemName: "plus.circle.fill")
                                     .resizable()
-                                    .frame(width: 28, height: 28)
-                                    .foregroundColor(.blue)
-                                    .background(Circle().fill(Color.white)) // 가독성을 위해 흰색 배경 추가
-                                    .shadow(radius: 2)
+                                    .scaledToFit()
+                                    .frame(width: 24, height: 24) // 크기를 살짝 줄여 더 깔끔하게
+                                    .foregroundColor(Color(.systemGray3)) // 연한 회색 설정
+                                    .background(Circle().fill(Color(.systemBackground))) // 배경과 어우러지는 배경색
+                                    .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
                             }
-                            .padding(.leading, 12)  // 좌측 여백
-                            .padding(.bottom, 12)   // 하단 여백(드래그 핸들과 겹치지 않게 조절)
+                            .padding(.leading, 10)
+                            .padding(.bottom, 10)
                             .buttonStyle(.plain)
                         }
 
