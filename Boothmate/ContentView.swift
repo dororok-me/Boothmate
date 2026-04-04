@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var menuExpanded = false
     @State private var isDraggingBar = false
     @State private var showLanguageAlert = false
+    @State private var showBoothAlert = false
 
     @State private var floatingBarOffset: CGSize = .zero
     @State private var floatingBarDragOffset: CGSize = .zero
@@ -206,6 +207,11 @@ struct ContentView: View {
                 } message: {
                     Text("녹음을 정지한 후 언어를 변경해 주세요")
                 }
+                .alert("Booth 변경", isPresented: $showBoothAlert) {
+                    Button("확인", role: .cancel) {}
+                } message: {
+                    Text("녹음을 정지한 후 Booth를 변경해 주세요")
+                }
         }
     }
 
@@ -232,18 +238,21 @@ struct ContentView: View {
                     // 1. Start/Stop
                     recordButton
 
-                    // 2. 언어 토글
+                    // 2. Booth 토글 (탭하면 KR→CN→JP 순환)
+                    boothToggle
+
+                    // 3. 언어 토글
                     languageToggle
 
-                    // 3. 확장 화살표 (언어 토글 바로 오른쪽으로 이동 및 색상 강화)
+                    // 4. 확장 화살표
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             menuExpanded.toggle()
                         }
                     } label: {
                         Image(systemName: menuExpanded ? "chevron.left" : "chevron.right")
-                            .font(.system(size: 14, weight: .bold)) // 두껍게 변경
-                            .foregroundColor(.primary) // 더 진한 색상(Primary)으로 변경
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.primary)
                             .frame(width: 24, height: 32)
                             .contentShape(Rectangle())
                     }
@@ -251,7 +260,7 @@ struct ContentView: View {
 
                     // --- 여기서부터는 확장(menuExpanded)되어야 보이는 메뉴 ---
                     if menuExpanded {
-                        // 4. 지우기 (확장 메뉴 안으로 이동)
+                        // 5. 지우기
                         Button {
                             speechManager.clearSubtitles()
                         } label: {
@@ -262,7 +271,7 @@ struct ContentView: View {
                         }
                         .buttonStyle(.plain)
 
-                        // 5. 글로서리 (확장 메뉴 안으로 이동)
+                        // 6. 글로서리
                         Button { showGlossary = true } label: {
                             Image(systemName: "text.book.closed")
                                 .font(.system(size: 15, weight: .semibold))
@@ -271,7 +280,7 @@ struct ContentView: View {
                         }
                         .buttonStyle(.plain)
 
-                        // 6. 폰트 크기
+                        // 7. 폰트 크기
                         Button { speechManager.cycleFontSize() } label: {
                             HStack(spacing: 0) {
                                 Text("A").font(.system(size: 13, weight: .medium))
@@ -282,7 +291,7 @@ struct ContentView: View {
                         }
                         .buttonStyle(.plain)
 
-                        // 7. 설정
+                        // 8. 설정
                         Button { showSettings = true } label: {
                             Image(systemName: "gearshape")
                                 .font(.system(size: 15, weight: .semibold))
@@ -321,6 +330,30 @@ struct ContentView: View {
                     }
                 }
         )
+    }
+
+    // MARK: - Booth Toggle
+
+    private var boothToggle: some View {
+        Button {
+            if speechManager.isRecording {
+                showBoothAlert = true
+            } else {
+                speechManager.selectedBooth = speechManager.selectedBooth.next
+                // Booth 변경 시 기본 언어로 리셋
+                speechManager.selectedLanguage = speechManager.selectedBooth.defaultLanguage
+            }
+        } label: {
+            Text(speechManager.selectedBooth.rawValue)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color.blue.opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .opacity(speechManager.isRecording ? 0.4 : 1.0)
     }
 
     // MARK: - Language Toggle
@@ -436,10 +469,17 @@ struct ContentView: View {
                 lineSpacing: speechManager.lineSpacing,
                 glossaryStore: glossaryStore  // glossaryStore를 뒤로 보냈습니다.
             ) { word in
+                // Booth 모드에 따라 적절한 사전으로 검색
+                let dicLanguage: String
+                switch speechManager.selectedBooth {
+                case .kr: dicLanguage = "en-US"   // 한영/영한 사전
+                case .cn: dicLanguage = "zh-CN"   // 한중/중한 사전
+                case .jp: dicLanguage = "ja-JP"   // 한일/일한 사전
+                }
                 NotificationCenter.default.post(
                     name: .searchDictionary,
                     object: word,
-                    userInfo: ["language": speechManager.selectedLanguage]
+                    userInfo: ["language": dicLanguage]
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)

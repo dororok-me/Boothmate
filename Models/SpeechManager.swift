@@ -20,6 +20,7 @@ class SpeechManager: ObservableObject {
     @Published var elapsedSeconds: Int = 0
     @Published var glossaryEnabled: Bool = true
     @Published var glossaryColor: GlossaryColor = .orange
+    @Published var selectedBooth: BoothMode = .kr
     
     // MARK: - Storage
     
@@ -42,12 +43,13 @@ class SpeechManager: ObservableObject {
     
     // MARK: - Constants
     
-    let languages = [
-        ("KR", "ko-KR"),
-        ("EN", "en-US"),
-        ("JP", "ja-JP"),
-        ("CN", "zh-CN")
-    ]
+    var languages: [(String, String)] {
+        switch selectedBooth {
+        case .kr: return [("KR", "ko-KR"), ("EN", "en-US")]
+        case .cn: return [("KR", "ko-KR"), ("CN", "zh-CN")]
+        case .jp: return [("KR", "ko-KR"), ("JP", "ja-JP")]
+        }
+    }
     
     // MARK: - Font Size
     
@@ -483,5 +485,51 @@ enum SubtitleTheme: String, CaseIterable, Identifiable {
     
     var lineColor: Color {
         Color.red.opacity(0.3)
+    }
+}
+
+// MARK: - Booth Mode
+
+enum BoothMode: String, CaseIterable, Identifiable {
+    case kr = "KR Booth"
+    case cn = "CN Booth"
+    case jp = "JP Booth"
+    
+    var id: String { rawValue }
+    
+    var shortLabel: String {
+        switch self {
+        case .kr: return "KR"
+        case .cn: return "CN"
+        case .jp: return "JP"
+        }
+    }
+    
+    var next: BoothMode {
+        switch self {
+        case .kr: return .cn
+        case .cn: return .jp
+        case .jp: return .kr
+        }
+    }
+    
+    var defaultLanguage: String {
+        switch self {
+        case .kr: return "ko-KR"
+        case .cn: return "ko-KR"
+        case .jp: return "ko-KR"
+        }
+    }
+    
+    /// 사전 검색용: 선택된 언어에 따라 적절한 사전 타입 결정
+    func dictionaryType(for language: String) -> String {
+        switch self {
+        case .kr:
+            return "eng"   // 한영/영한
+        case .cn:
+            return "ch"    // 한중/중한
+        case .jp:
+            return "jp"    // 한일/일한
+        }
     }
 }
