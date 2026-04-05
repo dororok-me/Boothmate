@@ -72,32 +72,41 @@ class SpeechManager: ObservableObject {
     // MARK: - Conversions (도량형 + 환율)
 
     private func applyConversions(to text: String) -> String {
-        var displayed = text
-        if unitConversionEnabled {
-            displayed = UnitConverter.applyConversion(to: displayed)
-            if let converter = currencyConverter {
-                displayed = converter.applyConversion(to: displayed)
+            var displayed = text
+            if unitConversionEnabled {
+                // 환율 먼저 (million의 m이 미터로 잡히는 것 방지)
+                if let converter = currencyConverter {
+                    displayed = converter.applyConversion(to: displayed)
+                }
+                // 도량형 나중에
+                displayed = UnitConverter.applyConversion(to: displayed)
             }
+            return displayed
         }
-        return displayed
-    }
 
     // MARK: - 확정 자막 처리
 
     private func processFinalText(_ rawText: String) {
-        var processed = applyGlossary(to: rawText)
-        processed = applyConversions(to: processed)
-        self.currentText = processed
-
-        if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            self.allSubtitles.append(self.currentText)
-            self.subtitles.append(self.currentText)
-            if self.subtitles.count > self.maxDisplayLines {
-                self.subtitles.removeFirst(self.subtitles.count - self.maxDisplayLines)
+            var processed = applyGlossary(to: rawText)
+            // 환율 먼저 (million의 m이 미터로 잡히는 것 방지)
+            if unitConversionEnabled, let converter = currencyConverter {
+                processed = converter.applyConversion(to: processed)
             }
+            // 도량형 나중에
+            if unitConversionEnabled {
+                processed = UnitConverter.applyConversion(to: processed)
+            }
+            self.currentText = processed
+
+            if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                self.allSubtitles.append(self.currentText)
+                self.subtitles.append(self.currentText)
+                if self.subtitles.count > self.maxDisplayLines {
+                    self.subtitles.removeFirst(self.subtitles.count - self.maxDisplayLines)
+                }
+            }
+            self.currentText = ""
         }
-        self.currentText = ""
-    }
 
     // MARK: - Start Recording
 
@@ -157,10 +166,17 @@ class SpeechManager: ObservableObject {
                         if result.isFinal {
                             self.processFinalText(rawText)
                         } else {
-                            if abs(rawText.count - self.currentText.count) > 2 || self.currentText.isEmpty {
-                                self.currentText = self.applyConversions(to: rawText)
-                            }
-                        }
+                                                    if abs(rawText.count - self.currentText.count) > 2 || self.currentText.isEmpty {
+                                                        var displayed = rawText
+                                                        if self.unitConversionEnabled, let converter = self.currencyConverter {
+                                                            displayed = converter.applyConversion(to: displayed)
+                                                        }
+                                                        if self.unitConversionEnabled {
+                                                            displayed = UnitConverter.applyConversion(to: displayed)
+                                                        }
+                                                        self.currentText = displayed
+                                                    }
+                                                }
                     }
                     if let error = error {
                         print("음성 인식 오류: \(error.localizedDescription)")
@@ -304,10 +320,17 @@ class SpeechManager: ObservableObject {
                         if result.isFinal {
                             self.processFinalText(rawText)
                         } else {
-                            if abs(rawText.count - self.currentText.count) > 2 || self.currentText.isEmpty {
-                                self.currentText = self.applyConversions(to: rawText)
-                            }
-                        }
+                                                    if abs(rawText.count - self.currentText.count) > 2 || self.currentText.isEmpty {
+                                                        var displayed = rawText
+                                                        if self.unitConversionEnabled, let converter = self.currencyConverter {
+                                                            displayed = converter.applyConversion(to: displayed)
+                                                        }
+                                                        if self.unitConversionEnabled {
+                                                            displayed = UnitConverter.applyConversion(to: displayed)
+                                                        }
+                                                        self.currentText = displayed
+                                                    }
+                                                }
                     }
                     if let error = error {
                         print("음성 인식 오류: \(error.localizedDescription)")

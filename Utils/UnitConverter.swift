@@ -5,61 +5,95 @@ struct UnitConverter {
     // MARK: - Main
 
     static func applyConversion(to text: String) -> String {
-        var output = text
+            var output = text
 
-        // 길이
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:miles|mile)\b"#, unit: "miles") { miles in
-            let km = miles * 1.60934
-            return formatNumber(km) + "km"
-        }
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:inches|inch|in\.)\b"#, unit: "inch") { inches in
-            let cm = inches * 2.54
-            return formatNumber(cm) + "cm"
-        }
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:feet|foot|ft)\b"#, unit: "ft") { feet in
-            let m = feet * 0.3048
-            return formatNumber(m) + "m"
-        }
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:yards|yard|yd)\b"#, unit: "yd") { yards in
-            let m = yards * 0.9144
-            return formatNumber(m) + "m"
-        }
+            // === 면적 먼저 (m²가 m보다 먼저 매칭되도록) ===
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:square feet|sq\.?\s*ft|sqft)\b"#, unit: "sqft") { sqft in
+                let pyeong = sqft * 0.0281
+                return formatNumber(pyeong) + "평"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:square meters|square meter|sq\.?\s*m|m²|㎡)"#, unit: "sqm") { sqm in
+                let pyeong = sqm * 0.3025
+                return formatNumber(pyeong) + "평"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:acres|acre)\b"#, unit: "acre") { acre in
+                let pyeong = acre * 1224.17
+                return formatNumber(pyeong) + "평"
+            }
+        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*만\s*평"#, unit: "만평") { manpyeong in
+                    let sqm = manpyeong * 10000 / 0.3025
+                    return formatNumber(sqm) + "m²"
+                }
+                output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:평)\b"#, unit: "평") { pyeong in
+                let sqm = pyeong / 0.3025
+                return formatNumber(sqm) + "m²"
+            }
 
-        // 무게
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:pounds|pound|lbs|lb)\b"#, unit: "lb") { lb in
-            let kg = lb * 0.453592
-            return formatNumber(kg) + "kg"
-        }
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:ounces|ounce|oz)\b"#, unit: "oz") { oz in
-            let g = oz * 28.3495
-            return formatNumber(g) + "g"
-        }
+            // === 길이 ===
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:miles|mile|마일)\b"#, unit: "miles") { miles in
+                let km = miles * 1.60934
+                return formatNumber(km) + "km"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:inches|inch|in\.|인치)\b"#, unit: "inch") { inches in
+                let cm = inches * 2.54
+                return formatNumber(cm) + "cm"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:feet|foot|ft|피트)\b"#, unit: "ft") { feet in
+                let m = feet * 0.3048
+                return formatNumber(m) + "m"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:yards|yard|yd|야드)\b"#, unit: "yd") { yards in
+                let m = yards * 0.9144
+                return formatNumber(m) + "m"
+            }
 
-        // 온도
-        output = convertTemperature(in: output)
+            // === 무게 ===
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:pounds|pound|lbs|lb|파운드)\b"#, unit: "lb") { lb in
+                let kg = lb * 0.453592
+                return formatNumber(kg) + "kg"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:ounces|ounce|oz|온스)\b"#, unit: "oz") { oz in
+                let g = oz * 28.3495
+                return formatNumber(g) + "g"
+            }
 
-        // 면적
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:square feet|sq\.?\s*ft|sqft)\b"#, unit: "sqft") { sqft in
-            let pyeong = sqft * 0.0281
-            return formatNumber(pyeong) + "평"
-        }
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:square meters|square meter|sq\.?\s*m|m²|㎡)"#, unit: "sqm") { sqm in
-            let pyeong = sqm * 0.3025
-            return formatNumber(pyeong) + "평"
-        }
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:acres|acre)\b"#, unit: "acre") { acre in
-            let pyeong = acre * 1224.17
-            return formatNumber(pyeong) + "평"
-        }
+            // === 온도 ===
+            output = convertTemperature(in: output)
 
-        // 부피
-        output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:gallons|gallon|gal)\b"#, unit: "gal") { gal in
-            let liter = gal * 3.78541
-            return formatNumber(liter) + "L"
-        }
+            // === 부피 ===
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:gallons|gallon|gal|갤런)\b"#, unit: "gal") { gal in
+                let liter = gal * 3.78541
+                return formatNumber(liter) + "L"
+            }
 
-        return output
-    }
+            // === 역방향 ===
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:킬로미터|킬로|km)\b"#, unit: "km") { km in
+                let miles = km / 1.60934
+                return formatNumber(miles) + "miles"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:센티미터|센티|cm)\b"#, unit: "cm") { cm in
+                let inches = cm / 2.54
+                return formatNumber(inches) + "inch"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*m(?!²|㎡|illion|illio)"#, unit: "m_rev") { m in
+                    let feet = m / 0.3048
+                    return formatNumber(feet) + "ft"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:킬로그램|킬로|kg)\b"#, unit: "kg") { kg in
+                let lb = kg / 0.453592
+                return formatNumber(lb) + "lb"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:그램|g)\b"#, unit: "g_rev") { g in
+                let oz = g / 28.3495
+                return formatNumber(oz) + "oz"
+            }
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:리터|L)\b"#, unit: "L") { liter in
+                let gal = liter / 3.78541
+                return formatNumber(gal) + "gal"
+            }
+
+            return output
+        }
 
     // MARK: - Generic Converter
 

@@ -59,13 +59,25 @@ class CurrencyConverter: ObservableObject {
     // MARK: - Apply Currency Conversion
 
     func applyConversion(to text: String) -> String {
-        var output = text
-        output = convertKRWtoUSD(in: output)
-        output = convertKoreanDollar(in: output)
-        output = convertLargeAmount(in: output)
-        output = convertForeignToKRW(in: output)
-        return output
-    }
+            var output = text
+
+            // 1. $숫자억/조 패턴 먼저 (한국어에서 $24억 같은 것)
+            output = convertDollarKoreanUnit(in: output)
+
+            // 2. 원화 → 달러
+            output = convertKRWtoUSD(in: output)
+
+            // 3. 한국어 달러 표현
+            output = convertKoreanDollar(in: output)
+
+            // 4. million/billion/trillion
+            output = convertLargeAmount(in: output)
+
+            // 5. 일반 외화 → 원화
+            output = convertForeignToKRW(in: output)
+
+            return output
+        }
 
     // MARK: - 영어: 외화 → 원화
 
@@ -87,10 +99,15 @@ class CurrencyConverter: ObservableObject {
 
                 if afterIndex < nsText.length && nsText.character(at: afterIndex) == Character("(").asciiValue! { continue }
 
-                if afterIndex + 7 <= nsText.length {
-                    let afterText = nsText.substring(with: NSRange(location: afterIndex, length: min(9, nsText.length - afterIndex))).lowercased()
-                    if afterText.hasPrefix(" million") || afterText.hasPrefix(" billion") || afterText.hasPrefix(" trillio") { continue }
-                }
+                if afterIndex < nsText.length {
+                                    let remaining = min(9, nsText.length - afterIndex)
+                                    let afterText = nsText.substring(with: NSRange(location: afterIndex, length: remaining))
+                                    let afterLower = afterText.lowercased()
+                                    if afterLower.hasPrefix(" million") || afterLower.hasPrefix(" billion") || afterLower.hasPrefix(" trillio") { continue }
+                                    // 한국어: $24억, $24 억 등 건너뛰기
+                                    if afterText.hasPrefix("억") || afterText.hasPrefix("조") || afterText.hasPrefix("만") ||
+                                       afterText.hasPrefix(" 억") || afterText.hasPrefix(" 조") || afterText.hasPrefix(" 만") { continue }
+                                }
 
                 let beforeText = nsText.substring(to: match.range.location)
                 let openCount = beforeText.filter({ $0 == "(" }).count
@@ -231,7 +248,49 @@ class CurrencyConverter: ObservableObject {
 
         return output
     }
+    // MARK: - $숫자 + 억/조/만 (한국어 모드)
 
+        private func convertDollarKoreanUnit(in text: String) -> String {
+            var output = text
+            guard let usdRate = rates["USD"], usdRate > 0 else { return output }
+
+            let patterns: [(String, Double)] = [
+                (#"\$\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*조"#, 1_000_000_000_000),
+                (#"\$\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*억"#, 100_000_000),
+                (#"\$\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*만"#, 10000),
+            ]
+
+            for (pattern, multiplier) in patterns {
+                guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { continue }
+
+                let nsText = output as NSString
+                let matches = regex.matches(in: output, range: NSRange(location: 0, length: nsText.length))
+
+                for match in matches.reversed() {
+                    let fullMatch = nsText.substring(with: match.range)
+                    let afterIndex = match.range.location + match.range.length
+                    if afterIndex < nsText.length && nsText.character(at: afterIndex) == Character("(").asciiValue! { continue }
+
+                    let beforeText = nsText.substring(to: match.range.location)
+                    let openCount = beforeText.filter({ $0 == "(" }).count
+                    let closeCount = beforeText.filter({ $0 == ")" }).count
+                    if openCount > closeCount { continue }
+
+                    let numberStr = nsText.substring(with: match.range(at: 1)).replacingOccurrences(of: ",", with: "")
+                    guard let amount = Double(numberStr) else { continue }
+
+                    let usd = amount * multiplier
+                    let krw = usd * usdRate
+                    let dollarKorean = formatDollarKorean(usd)
+                    let krwText = formatKRW(krw)
+                    let replacement = "\(dollarKorean)(\(krwText))"
+                    output = (output as NSString).replacingCharacters(in: match.range, with: replacement)
+                }
+            }
+
+            return output
+        }
+    
     // MARK: - 한국어: 달러 표현 → 한글 단위 + 원화 환산
 
     private func convertKoreanDollar(in text: String) -> String {
@@ -292,6 +351,30 @@ class CurrencyConverter: ObservableObject {
             }
         }
 
+        // 작은 숫자 + 달러 (쉼표 없는 것)
+                if let regex = try? NSRegularExpression(pattern: #"(\d+(?:\.\d+)?)\s*달러"#, options: []) {
+                    let nsText = output as NSString
+                    let matches = regex.matches(in: output, range: NSRange(location: 0, length: nsText.length))
+
+                    for match in matches.reversed() {
+                        let fullMatch = nsText.substring(with: match.range)
+                        let afterIndex = match.range.location + match.range.length
+                        if afterIndex < nsText.length && nsText.character(at: afterIndex) == Character("(").asciiValue! { continue }
+
+                        let beforeText = nsText.substring(to: match.range.location)
+                        let openCount = beforeText.filter({ $0 == "(" }).count
+                        let closeCount = beforeText.filter({ $0 == ")" }).count
+                        if openCount > closeCount { continue }
+
+                        let numberStr = nsText.substring(with: match.range(at: 1))
+                        guard let usd = Double(numberStr) else { continue }
+
+                        let krw = usd * usdRate
+                        let krwText = formatKRW(krw)
+                        output = (output as NSString).replacingCharacters(in: match.range, with: "\(fullMatch)(\(krwText))")
+                    }
+                }
+        
         // 한글 숫자 + 조/억/만 달러
         let koreanDigits: [(String, Double)] = [
             ("일", 1), ("이", 2), ("삼", 3), ("사", 4), ("오", 5),
@@ -500,17 +583,13 @@ class CurrencyConverter: ObservableObject {
     }
 
     // 4자리: 천백십일 모두 (만 단위용)
-    private func subUnit4Full(_ value: Int) -> String {
-        if value == 0 { return "" }
-        var result = ""
-        let cheon = value / 1000
-        let baek = (value % 1000) / 100
-        let sip = (value % 100) / 10
-        let il = value % 10
-        if cheon > 0 { result += "\(cheon)천" }
-        if baek > 0 { result += "\(baek)백" }
-        if sip > 0 { result += "\(sip)십" }
-        if il > 0 { result += "\(il)" }
-        return result
-    }
+    // 4자리: 숫자+쉼표로 표시 (만 단위용)
+        private func subUnit4Full(_ value: Int) -> String {
+            if value == 0 { return "" }
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+            formatter.groupingSeparator = ","
+            formatter.maximumFractionDigits = 0
+            return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+        }
 }
