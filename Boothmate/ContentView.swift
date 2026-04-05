@@ -425,7 +425,7 @@ struct ContentView: View {
     // MARK: - Subtitle Area
 
     private func subtitleArea(leftDangerInset: CGFloat) -> some View {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .topTrailing) {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: speechManager.lineSpacing) {
@@ -453,7 +453,7 @@ struct ContentView: View {
                 if speechManager.useAzure && speechManager.isRecording {
                     AzureBadge()
                         .padding(.trailing, 12)
-                        .padding(.bottom, 12)
+                        .padding(.top, 12)
                 }
             }
         }

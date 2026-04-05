@@ -210,7 +210,7 @@ struct SettingsView: View {
                 Text("Boothmate v1.0")
                     .font(.footnote.bold())
                     .foregroundColor(.secondary)
-                Text("dororok studio")
+                Text("dororok AI Lab")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
