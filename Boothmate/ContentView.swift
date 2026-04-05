@@ -4,6 +4,7 @@ import UIKit
 struct ContentView: View {
     @StateObject private var speechManager = SpeechManager()
     @StateObject private var glossaryStore = GlossaryStore()
+    @StateObject private var currencyConverter = CurrencyConverter()
 
     @State private var horizontalSplit: CGFloat = 0.42
     @State private var leftVerticalSplit: CGFloat = 0.62
@@ -195,6 +196,12 @@ struct ContentView: View {
             .sheet(isPresented: $showGlossary) {
                 GlossaryView(glossaryStore: glossaryStore)
             }
+            .onAppear {
+                            speechManager.requestPermissions()
+                            speechManager.glossaryStore = glossaryStore
+                            speechManager.currencyConverter = currencyConverter
+                            currencyConverter.fetchRates()
+                        }
 
             // MARK: - 플로팅 메뉴바
             floatingMenuBar

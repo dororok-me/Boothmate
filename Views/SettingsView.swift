@@ -108,6 +108,7 @@ struct SettingsView: View {
     private var glossarySection: some View {
         Section("Glossary") {
             Toggle("글로서리 적용", isOn: $speechManager.glossaryEnabled)
+            Toggle("도량형 자동 환산", isOn: $speechManager.unitConversionEnabled)
 
             Button {
                 showGlossaryList = true
