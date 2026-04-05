@@ -6,8 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5DF42546ED4005D224D12AD7 /* Pods_Boothmate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DEAE30559BDBB207F335C895 /* Pods_Boothmate.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		0EB846CF2F756DA700F12CAB /* Boothmate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Boothmate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4712B20715B9CCA09C7A96AF /* Pods-Boothmate.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Boothmate.release.xcconfig"; path = "Target Support Files/Pods-Boothmate/Pods-Boothmate.release.xcconfig"; sourceTree = "<group>"; };
+		4CB75CF8C60C06992D0AC574 /* Pods-Boothmate.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Boothmate.debug.xcconfig"; path = "Target Support Files/Pods-Boothmate/Pods-Boothmate.debug.xcconfig"; sourceTree = "<group>"; };
+		DEAE30559BDBB207F335C895 /* Pods_Boothmate.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Boothmate.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -38,6 +45,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DF42546ED4005D224D12AD7 /* Pods_Boothmate.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -52,6 +60,8 @@
 				0EF174CA2F76B8D200E33D9A /* Utils */,
 				0EB846D12F756DA700F12CAB /* Boothmate */,
 				0EB846D02F756DA700F12CAB /* Products */,
+				EB18CACDDECEC280608D224B /* Pods */,
+				D8023A03E7BB132009A59CA9 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -63,6 +73,23 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		D8023A03E7BB132009A59CA9 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				DEAE30559BDBB207F335C895 /* Pods_Boothmate.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		EB18CACDDECEC280608D224B /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				4CB75CF8C60C06992D0AC574 /* Pods-Boothmate.debug.xcconfig */,
+				4712B20715B9CCA09C7A96AF /* Pods-Boothmate.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -70,9 +97,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 0EB846DA2F756DA800F12CAB /* Build configuration list for PBXNativeTarget "Boothmate" */;
 			buildPhases = (
+				449E9C877184E93EB8E5AF5A /* [CP] Check Pods Manifest.lock */,
 				0EB846CB2F756DA700F12CAB /* Sources */,
 				0EB846CC2F756DA700F12CAB /* Frameworks */,
 				0EB846CD2F756DA700F12CAB /* Resources */,
+				5946EBDF227289DD5B8B6569 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -85,8 +114,6 @@
 				0EF174D42F76B8E100E33D9A /* Views */,
 			);
 			name = Boothmate;
-			packageProductDependencies = (
-			);
 			productName = Boothmate;
 			productReference = 0EB846CF2F756DA700F12CAB /* Boothmate.app */;
 			productType = "com.apple.product-type.application";
@@ -134,6 +161,52 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		449E9C877184E93EB8E5AF5A /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Boothmate-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		5946EBDF227289DD5B8B6569 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Boothmate/Pods-Boothmate-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Boothmate/Pods-Boothmate-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Boothmate/Pods-Boothmate-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0EB846CB2F756DA700F12CAB /* Sources */ = {
@@ -184,7 +257,7 @@
 				DEVELOPMENT_TEAM = 7WHUP4PG44;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -248,7 +321,7 @@
 				DEVELOPMENT_TEAM = 7WHUP4PG44;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -269,6 +342,7 @@
 		};
 		0EB846DB2F756DA800F12CAB /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4CB75CF8C60C06992D0AC574 /* Pods-Boothmate.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -304,6 +378,7 @@
 		};
 		0EB846DC2F756DA800F12CAB /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4712B20715B9CCA09C7A96AF /* Pods-Boothmate.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

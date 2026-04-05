@@ -14,6 +14,7 @@ struct SettingsView: View {
                 fontSection
                 themeSection
                 glossarySection
+                azureSection
                 exportSection
                 aboutSection
             }
@@ -155,24 +156,54 @@ struct SettingsView: View {
         }
     }
 
-    private var exportSection: some View {
-        Section("자막 내보내기") {
-            Button {
-                shareSubtitles()
-            } label: {
-                HStack {
-                    Image(systemName: "square.and.arrow.up")
-                    Text("자막을 텍스트 파일로 내보내기")
+    private var azureSection: some View {
+            Section("Azure STT (고급)") {
+                Toggle("Azure 사용", isOn: $speechManager.useAzure)
+
+                if speechManager.useAzure {
+                    HStack {
+                        Text("API Key")
+                        Spacer()
+                        SecureField("API Key 입력", text: $speechManager.azureApiKey)
+                            .multilineTextAlignment(.trailing)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+
+                    HStack {
+                        Text("Region")
+                        Spacer()
+                        TextField("예: koreacentral", text: $speechManager.azureRegion)
+                            .multilineTextAlignment(.trailing)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+
+                    Text("Azure Portal에서 Speech 리소스의 키와 지역을 입력하세요")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
-            .disabled(speechManager.allSubtitles.isEmpty)
-
-            Text("총 \(speechManager.allSubtitles.count)줄 저장됨")
-                .font(.footnote)
-                .foregroundColor(.secondary)
         }
-    }
 
+    private var exportSection: some View {
+            Section("자막 내보내기") {
+                Button {
+                    shareSubtitles()
+                } label: {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("자막을 텍스트 파일로 내보내기")
+                    }
+                }
+                .disabled(speechManager.allSubtitles.isEmpty)
+
+                Text("총 \(speechManager.allSubtitles.count)줄 저장됨")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+        }
+    
     private var aboutSection: some View {
         Section {
             VStack(spacing: 4) {

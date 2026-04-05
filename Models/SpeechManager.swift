@@ -28,6 +28,12 @@ class SpeechManager: ObservableObject {
     var allSubtitles: [String] = []
     weak var glossaryStore: GlossaryStore?
     var currencyConverter: CurrencyConverter?
+    
+    // MARK: - Azure STT
+        @Published var useAzure: Bool = false
+        @Published var azureApiKey: String = ""
+        @Published var azureRegion: String = "koreacentral"
+        private let azureSpeechManager = AzureSpeechManager()
 
     // MARK: - Private Properties
 
@@ -108,10 +114,71 @@ class SpeechManager: ObservableObject {
             self.currentText = ""
         }
 
+    // MARK: - Azure Recording
+
+        func startAzureRecording() {
+            guard !azureApiKey.isEmpty else {
+                print("Azure API 키가 없습니다")
+                return
+            }
+
+            stopRecording()
+            isRecording = true
+            elapsedSeconds = 0
+
+            // 타이머
+            let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.elapsedSeconds += 1
+                }
+            }
+            RunLoop.main.add(newTimer, forMode: .common)
+            timer = newTimer
+
+            // Azure 콜백
+            azureSpeechManager.onRecognizing = { [weak self] text in
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    var displayed = text
+                    if self.unitConversionEnabled, let converter = self.currencyConverter {
+                        displayed = converter.applyConversion(to: displayed)
+                    }
+                    if self.unitConversionEnabled {
+                        displayed = UnitConverter.applyConversion(to: displayed)
+                    }
+                    self.currentText = displayed
+                }
+            }
+
+            azureSpeechManager.onRecognized = { [weak self] text in
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    self.processFinalText(text)
+                }
+            }
+
+            azureSpeechManager.onError = { [weak self] error in
+                Task { @MainActor in
+                    print("❌ \(error)")
+                    self?.stopRecording()
+                }
+            }
+
+            azureSpeechManager.startRecording(
+                apiKey: azureApiKey,
+                region: azureRegion,
+                language: selectedLanguage
+            )
+        }
+    
     // MARK: - Start Recording
 
     func startRecording() {
-        stopRecording()
+            if useAzure {
+                startAzureRecording()
+                return
+            }
+            stopRecording()
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
@@ -191,8 +258,8 @@ class SpeechManager: ObservableObject {
     // MARK: - Stop Recording
 
     func stopRecording() {
+        azureSpeechManager.stopRecording()
         audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionRequest = nil

@@ -425,40 +425,38 @@ struct ContentView: View {
     // MARK: - Subtitle Area
 
     private func subtitleArea(leftDangerInset: CGFloat) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: speechManager.lineSpacing) {
-                    ForEach(speechManager.subtitles.indices, id: \.self) { index in
-                        subtitleBlock(
-                            text: speechManager.subtitles[index],
-                            opacity: 1.0,
-                            leftDangerInset: leftDangerInset
-                        )
-                        .id(index)
-                    }
+            ZStack(alignment: .bottomTrailing) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: speechManager.lineSpacing) {
+                            ForEach(speechManager.subtitles.indices, id: \.self) { index in
+                                subtitleBlock(text: speechManager.subtitles[index], opacity: 1.0, leftDangerInset: leftDangerInset)
+                                    .id(index)
+                            }
 
-                    if !speechManager.currentText.isEmpty {
-                        subtitleBlock(
-                            text: speechManager.currentText,
-                            opacity: 0.65,
-                            leftDangerInset: leftDangerInset
-                        )
-                        .id("current")
-                    }
+                            if !speechManager.currentText.isEmpty {
+                                subtitleBlock(text: speechManager.currentText, opacity: 0.65, leftDangerInset: leftDangerInset)
+                                    .id("current")
+                            }
 
-                    Color.clear
-                        .frame(height: 1)
-                        .id("bottomAnchor")
+                            Color.clear.frame(height: 1).id("bottomAnchor")
+                        }
+                        .padding(.top, 8)
+                        .padding(.bottom, 16)
+                    }
+                    .onAppear { scrollToBottom(proxy) }
+                    .onChange(of: speechManager.currentText) { _ in scrollToBottom(proxy) }
+                    .onChange(of: speechManager.subtitles.count) { _ in scrollToBottom(proxy) }
                 }
-                .padding(.top, 8)
-                .padding(.bottom, 16)
-            }
-            .onAppear { scrollToBottom(proxy) }
-            .onChange(of: speechManager.currentText) { _ in scrollToBottom(proxy) }
-            .onChange(of: speechManager.subtitles.count) { _ in scrollToBottom(proxy) }
-        }
-    }
 
+                // Azure 로고
+                if speechManager.useAzure && speechManager.isRecording {
+                    AzureBadge()
+                        .padding(.trailing, 12)
+                        .padding(.bottom, 12)
+                }
+            }
+        }
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         proxy.scrollTo("bottomAnchor", anchor: .bottom)
     }
@@ -529,5 +527,29 @@ struct ContentView: View {
 
     private func clamp(value: CGFloat, minValue: CGFloat, maxValue: CGFloat) -> CGFloat {
         min(max(value, minValue), maxValue)
+    }
+}
+
+struct AzureBadge: View {
+    @State private var glowing = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "cloud.fill")
+                .font(.system(size: 10))
+            Text("Azure")
+                .font(.system(size: 9, weight: .semibold))
+        }
+        .foregroundColor(.blue)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.blue.opacity(0.1))
+        .clipShape(Capsule())
+        .opacity(glowing ? 1.0 : 0.4)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                glowing = true
+            }
+        }
     }
 }
