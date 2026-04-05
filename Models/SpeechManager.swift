@@ -30,9 +30,9 @@ class SpeechManager: ObservableObject {
     var currencyConverter: CurrencyConverter?
     
     // MARK: - Azure STT
-        @Published var useAzure: Bool = false
-        @Published var azureApiKey: String = ""
-        @Published var azureRegion: String = "koreacentral"
+    @AppStorage("useAzure") var useAzure: Bool = false
+    @AppStorage("azureApiKey") var azureApiKey: String = ""
+    @AppStorage("azureRegion") var azureRegion: String = "koreacentral"
         private let azureSpeechManager = AzureSpeechManager()
 
     // MARK: - Private Properties

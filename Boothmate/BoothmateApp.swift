@@ -1,10 +1,3 @@
-//
-//  BoothmateApp.swift
-//  Boothmate
-//
-//  Created by dororok on 3/26/26.
-//
-
 import SwiftUI
 
 @main
@@ -13,6 +6,9 @@ struct BoothmateApp: App {
         WindowGroup {
             ContentView()
                 .preferredColorScheme(.light)
+                .onAppear {
+                    UIApplication.shared.isIdleTimerDisabled = true
+                }
         }
     }
 }
