@@ -23,17 +23,19 @@ class SpeechManager: ObservableObject {
     @Published var unitConversionEnabled: Bool = true
     @Published var selectedBooth: BoothMode = .kr
 
+    @Published var scrollTrigger: Int = 0
+
     // MARK: - Storage
 
     var allSubtitles: [String] = []
     weak var glossaryStore: GlossaryStore?
     var currencyConverter: CurrencyConverter?
-    
+
     // MARK: - Azure STT
     @AppStorage("useAzure") var useAzure: Bool = false
     @AppStorage("azureApiKey") var azureApiKey: String = ""
     @AppStorage("azureRegion") var azureRegion: String = "koreacentral"
-        private let azureSpeechManager = AzureSpeechManager()
+    private let azureSpeechManager = AzureSpeechManager()
 
     // MARK: - Private Properties
 
@@ -41,13 +43,19 @@ class SpeechManager: ObservableObject {
     private let fontSizes: [CGFloat] = [16, 22, 28, 36]
     private var fontSizeIndex: Int = 1
     private var timer: Timer?
-    private var sessionSeconds: Int = 0
-    private var isRestarting = false
 
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
+
+    // currentText throttle
+    private var lastUpdateTime: Date = .distantPast
+
+    // Apple Speech 10분 리셋용
+    private var sessionSeconds: Int = 0
+    private var isRestarting = false
+    private let sessionLimit = 600  // 10분
 
     // MARK: - Languages
 
@@ -75,110 +83,107 @@ class SpeechManager: ObservableObject {
         }
     }
 
-    // MARK: - Conversions (도량형 + 환율)
+    // MARK: - Conversions
 
     private func applyConversions(to text: String) -> String {
-            var displayed = text
-            if unitConversionEnabled {
-                // 환율 먼저 (million의 m이 미터로 잡히는 것 방지)
-                if let converter = currencyConverter {
-                    displayed = converter.applyConversion(to: displayed)
-                }
-                // 도량형 나중에
-                displayed = UnitConverter.applyConversion(to: displayed)
+        var displayed = text
+        if unitConversionEnabled {
+            if let converter = currencyConverter {
+                displayed = converter.applyConversion(to: displayed)
             }
-            return displayed
+            displayed = UnitConverter.applyConversion(to: displayed)
         }
+        return displayed
+    }
+
+    // MARK: - 실시간 자막 업데이트 (throttle + 글로서리)
+
+    private func updateCurrentText(_ rawText: String) {
+        let now = Date()
+        guard now.timeIntervalSince(lastUpdateTime) > 0.1 else { return }
+        lastUpdateTime = now
+
+        var displayed = applyGlossary(to: rawText)
+        displayed = applyConversions(to: displayed)
+
+        self.currentText = displayed
+        self.scrollTrigger += 1
+    }
 
     // MARK: - 확정 자막 처리
 
     private func processFinalText(_ rawText: String) {
-            var processed = applyGlossary(to: rawText)
-            // 환율 먼저 (million의 m이 미터로 잡히는 것 방지)
-            if unitConversionEnabled, let converter = currencyConverter {
-                processed = converter.applyConversion(to: processed)
-            }
-            // 도량형 나중에
-            if unitConversionEnabled {
-                processed = UnitConverter.applyConversion(to: processed)
-            }
-            self.currentText = processed
+        var processed = applyGlossary(to: rawText)
+        processed = applyConversions(to: processed)
+        self.currentText = processed
 
-            if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                self.allSubtitles.append(self.currentText)
-                self.subtitles.append(self.currentText)
-                if self.subtitles.count > self.maxDisplayLines {
-                    self.subtitles.removeFirst(self.subtitles.count - self.maxDisplayLines)
-                }
+        if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            self.allSubtitles.append(self.currentText)
+            self.subtitles.append(self.currentText)
+            if self.subtitles.count > self.maxDisplayLines {
+                self.subtitles.removeFirst(self.subtitles.count - self.maxDisplayLines)
             }
-            self.currentText = ""
         }
+        self.currentText = ""
+        self.scrollTrigger += 1
+    }
 
     // MARK: - Azure Recording
 
-        func startAzureRecording() {
-            guard !azureApiKey.isEmpty else {
-                print("Azure API 키가 없습니다")
-                return
-            }
-
-            stopRecording()
-            isRecording = true
-            elapsedSeconds = 0
-
-            // 타이머
-            let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-                Task { @MainActor in
-                    self?.elapsedSeconds += 1
-                }
-            }
-            RunLoop.main.add(newTimer, forMode: .common)
-            timer = newTimer
-
-            // Azure 콜백
-            azureSpeechManager.onRecognizing = { [weak self] text in
-                Task { @MainActor in
-                    guard let self = self else { return }
-                    var displayed = text
-                    if self.unitConversionEnabled, let converter = self.currencyConverter {
-                        displayed = converter.applyConversion(to: displayed)
-                    }
-                    if self.unitConversionEnabled {
-                        displayed = UnitConverter.applyConversion(to: displayed)
-                    }
-                    self.currentText = displayed
-                }
-            }
-
-            azureSpeechManager.onRecognized = { [weak self] text in
-                Task { @MainActor in
-                    guard let self = self else { return }
-                    self.processFinalText(text)
-                }
-            }
-
-            azureSpeechManager.onError = { [weak self] error in
-                Task { @MainActor in
-                    print("❌ \(error)")
-                    self?.stopRecording()
-                }
-            }
-
-            azureSpeechManager.startRecording(
-                apiKey: azureApiKey,
-                region: azureRegion,
-                language: selectedLanguage
-            )
+    func startAzureRecording() {
+        guard !azureApiKey.isEmpty else {
+            print("Azure API 키가 없습니다")
+            return
         }
-    
-    // MARK: - Start Recording
+
+        stopRecording()
+        isRecording = true
+        elapsedSeconds = 0
+
+        let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.elapsedSeconds += 1
+            }
+        }
+        RunLoop.main.add(newTimer, forMode: .common)
+        timer = newTimer
+
+        azureSpeechManager.onRecognizing = { [weak self] text in
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.updateCurrentText(text)
+            }
+        }
+
+        azureSpeechManager.onRecognized = { [weak self] text in
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.processFinalText(text)
+            }
+        }
+
+        azureSpeechManager.onError = { [weak self] error in
+            Task { @MainActor in
+                print("❌ \(error)")
+                self?.stopRecording()
+            }
+        }
+
+        azureSpeechManager.startRecording(
+            apiKey: azureApiKey,
+            region: azureRegion,
+            language: selectedLanguage
+        )
+    }
+
+    // MARK: - Start Recording (Apple Speech)
 
     func startRecording() {
-            if useAzure {
-                startAzureRecording()
-                return
-            }
-            stopRecording()
+        if useAzure {
+            startAzureRecording()
+            return
+        }
+        stopRecording()
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
@@ -217,8 +222,10 @@ class SpeechManager: ObservableObject {
                     guard let self = self else { return }
                     self.elapsedSeconds += 1
                     self.sessionSeconds += 1
-                    if self.sessionSeconds >= 420 && self.isRecording && !self.isPaused && !self.isRestarting {
-                        self.restartRecording()
+                    // Apple Speech 10분 리셋
+                    if self.sessionSeconds >= self.sessionLimit
+                        && self.isRecording && !self.isRestarting {
+                        self.restartRecognition()
                     }
                 }
             }
@@ -233,20 +240,14 @@ class SpeechManager: ObservableObject {
                         if result.isFinal {
                             self.processFinalText(rawText)
                         } else {
-                                                    if abs(rawText.count - self.currentText.count) > 2 || self.currentText.isEmpty {
-                                                        var displayed = rawText
-                                                        if self.unitConversionEnabled, let converter = self.currencyConverter {
-                                                            displayed = converter.applyConversion(to: displayed)
-                                                        }
-                                                        if self.unitConversionEnabled {
-                                                            displayed = UnitConverter.applyConversion(to: displayed)
-                                                        }
-                                                        self.currentText = displayed
-                                                    }
-                                                }
+                            self.updateCurrentText(rawText)
+                        }
                     }
                     if let error = error {
-                        print("음성 인식 오류: \(error.localizedDescription)")
+                        // 리스타트 중 에러는 무시
+                        if !self.isRestarting {
+                            print("음성 인식 오류: \(error.localizedDescription)")
+                        }
                     }
                 }
             }
@@ -255,69 +256,13 @@ class SpeechManager: ObservableObject {
         }
     }
 
-    // MARK: - Stop Recording
+    // MARK: - 10분 리셋 (매끄러운 전환)
 
-    func stopRecording() {
-        azureSpeechManager.stopRecording()
-        audioEngine.stop()
-        recognitionRequest?.endAudio()
-        recognitionTask?.cancel()
-        recognitionRequest = nil
-        recognitionTask = nil
-        isRecording = false
-        isPaused = false
-        isRestarting = false
-        timer?.invalidate()
-        timer = nil
-
-        let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            var processed = applyGlossary(to: currentText)
-            processed = applyConversions(to: processed)
-            allSubtitles.append(processed)
-            subtitles.append(processed)
-            if subtitles.count > maxDisplayLines {
-                subtitles.removeFirst(subtitles.count - maxDisplayLines)
-            }
-        }
-        currentText = ""
-    }
-
-    // MARK: - Pause / Resume
-
-    func pauseRecording() {
-        guard isRecording, !isPaused else { return }
-        audioEngine.pause()
-        isPaused = true
-        timer?.invalidate()
-        timer = nil
-    }
-
-    func resumeRecording() {
-        guard isRecording, isPaused else { return }
-        try? audioEngine.start()
-        isPaused = false
-        sessionSeconds = 0
-        let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self = self else { return }
-                self.elapsedSeconds += 1
-                self.sessionSeconds += 1
-                if self.sessionSeconds >= 420 && self.isRecording && !self.isPaused && !self.isRestarting {
-                    self.restartRecording()
-                }
-            }
-        }
-        RunLoop.main.add(newTimer, forMode: .common)
-        timer = newTimer
-    }
-
-    // MARK: - Restart
-
-    private func restartRecording() {
+    private func restartRecognition() {
         guard !isRestarting else { return }
         isRestarting = true
 
+        // 현재 인식 세션 정리
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
@@ -325,6 +270,7 @@ class SpeechManager: ObservableObject {
         recognitionRequest = nil
         recognitionTask = nil
 
+        // 현재 텍스트가 있으면 확정 처리
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
             var processed = applyGlossary(to: trimmed)
@@ -337,12 +283,13 @@ class SpeechManager: ObservableObject {
         }
         currentText = ""
 
+        // 짧은 딜레이 후 재시작
         Task {
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            if self.isRecording && !self.isPaused {
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2초
+            if self.isRecording {
                 self.sessionSeconds = 0
                 self.isRestarting = false
-                self.startRecordingWithoutReset()
+                self.startRecognitionOnly()
                 print("🔄 음성인식 세션 리스타트 (\(self.elapsedSeconds)초)")
             } else {
                 self.isRestarting = false
@@ -350,9 +297,9 @@ class SpeechManager: ObservableObject {
         }
     }
 
-    // MARK: - Start Without Reset
+    // MARK: - 리셋 시 인식만 재시작 (타이머/UI 유지)
 
-    private func startRecordingWithoutReset() {
+    private func startRecognitionOnly() {
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else { return }
 
@@ -387,26 +334,48 @@ class SpeechManager: ObservableObject {
                         if result.isFinal {
                             self.processFinalText(rawText)
                         } else {
-                                                    if abs(rawText.count - self.currentText.count) > 2 || self.currentText.isEmpty {
-                                                        var displayed = rawText
-                                                        if self.unitConversionEnabled, let converter = self.currencyConverter {
-                                                            displayed = converter.applyConversion(to: displayed)
-                                                        }
-                                                        if self.unitConversionEnabled {
-                                                            displayed = UnitConverter.applyConversion(to: displayed)
-                                                        }
-                                                        self.currentText = displayed
-                                                    }
-                                                }
+                            self.updateCurrentText(rawText)
+                        }
                     }
                     if let error = error {
-                        print("음성 인식 오류: \(error.localizedDescription)")
+                        if !self.isRestarting {
+                            print("음성 인식 오류: \(error.localizedDescription)")
+                        }
                     }
                 }
             }
         } catch {
             print("리스타트 오류: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Stop Recording
+
+    func stopRecording() {
+        azureSpeechManager.stopRecording()
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionRequest = nil
+        recognitionTask = nil
+        isRecording = false
+        isPaused = false
+        isRestarting = false
+        timer?.invalidate()
+        timer = nil
+
+        let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            var processed = applyGlossary(to: currentText)
+            processed = applyConversions(to: processed)
+            allSubtitles.append(processed)
+            subtitles.append(processed)
+            if subtitles.count > maxDisplayLines {
+                subtitles.removeFirst(subtitles.count - maxDisplayLines)
+            }
+        }
+        currentText = ""
     }
 
     // MARK: - Subtitles Management
@@ -431,6 +400,7 @@ class SpeechManager: ObservableObject {
         var output = text
         let sortedEntries = glossaryStore.entries.sorted { $0.source.count > $1.source.count }
 
+        // 1단계: 복합어(공백 포함) 먼저 처리
         for entry in sortedEntries {
             let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
             let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -451,6 +421,7 @@ class SpeechManager: ObservableObject {
             }
         }
 
+        // 2단계: 단일 단어 처리
         let words = output.components(separatedBy: " ")
         var result: [String] = []
 

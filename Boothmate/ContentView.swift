@@ -1,342 +1,263 @@
 import SwiftUI
 import UIKit
+import Speech
+import AVFoundation
+import WebKit
+import QuickLook
+import UniformTypeIdentifiers
+
+// MARK: - 색상 정의
+
+struct AppColors {
+    // 메뉴바 아이콘 통일 색상 (검은색 90%)
+    static let menuIcon = Color.primary.opacity(0.9)
+
+    // Booth 색깔
+    static let boothKR = Color.orange
+    static let boothCN = Color(red: 0.9, green: 0.3, blue: 0.35)
+    static let boothJP = Color(red: 0.3, green: 0.5, blue: 0.9)
+
+    // 우측 패널 탭 파스텔 색깔
+    static let tabDictionary = Color(red: 0.6, green: 0.82, blue: 0.88)  // 파스텔 하늘
+    static let tabFile = Color(red: 0.95, green: 0.78, blue: 0.65)       // 파스텔 살구
+    static let tabWeb = Color(red: 0.75, green: 0.85, blue: 0.72)        // 파스텔 민트
+    static let tabMemo = Color(red: 0.88, green: 0.75, blue: 0.92)       // 파스텔 라벤더
+}
 
 struct ContentView: View {
     @StateObject private var speechManager = SpeechManager()
     @StateObject private var glossaryStore = GlossaryStore()
     @StateObject private var currencyConverter = CurrencyConverter()
 
-    @State private var horizontalSplit: CGFloat = 0.42
-    @State private var leftVerticalSplit: CGFloat = 0.62
-    @State private var rightVerticalSplit: CGFloat = 0.50
-
     @State private var showSettings = false
     @State private var showGlossary = false
-    @State private var menuExpanded = false
-    @State private var isDraggingBar = false
     @State private var showLanguageAlert = false
     @State private var showBoothAlert = false
 
-    @State private var floatingBarOffset: CGSize = .zero
-    @State private var floatingBarDragOffset: CGSize = .zero
+    @State private var showRightPanel = true
 
-    @State private var horizontalSplitDragStart: CGFloat?
-    @State private var leftVerticalSplitDragStart: CGFloat?
-    @State private var rightVerticalSplitDragStart: CGFloat?
+    enum RightPanelTab: String, CaseIterable {
+        case dictionary = "사전"
+        case file = "파일"
+        case web = "웹"
+        case memo = "메모"
 
-    private let dividerHitThickness: CGFloat = 28
-    private let visibleDividerThickness: CGFloat = 1
-    private let minPaneWidth: CGFloat = 90
-    private let minPaneHeight: CGFloat = 28
-    private let topBarHeight: CGFloat = 50
-
-    var body: some View {
-        ZStack {
-            GeometryReader { geo in
-                let totalWidth = geo.size.width
-                let totalHeight = geo.size.height
-                let safeTop = geo.safeAreaInsets.top
-                let safeLeading = geo.safeAreaInsets.leading
-                let isLandscape = totalWidth > totalHeight
-                let leftDangerInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
-                let topSafeSpacing = safeTop + 8
-
-                let leftWidth = clamp(
-                    value: (totalWidth - dividerHitThickness) * horizontalSplit,
-                    minValue: minPaneWidth,
-                    maxValue: totalWidth - dividerHitThickness - minPaneWidth
-                )
-                let rightWidth = totalWidth - leftWidth - dividerHitThickness
-
-                let leftContentHeight = totalHeight - topSafeSpacing - topBarHeight - dividerHitThickness
-                let rightContentHeight = totalHeight - dividerHitThickness
-
-                let leftTopHeight = clamp(
-                    value: leftContentHeight * leftVerticalSplit,
-                    minValue: minPaneHeight,
-                    maxValue: leftContentHeight - minPaneHeight
-                )
-                let leftBottomHeight = leftContentHeight - leftTopHeight
-
-                let rightTopHeight = clamp(
-                    value: rightContentHeight * rightVerticalSplit,
-                    minValue: minPaneHeight,
-                    maxValue: rightContentHeight - minPaneHeight
-                )
-                let rightBottomHeight = rightContentHeight - rightTopHeight
-
-                HStack(spacing: 0) {
-                    // MARK: - 왼쪽: 자막 + 메모
-                    VStack(spacing: 0) {
-                        Color.clear
-                            .frame(height: topBarHeight)
-                            .padding(.top, topSafeSpacing)
-
-                        subtitleArea(leftDangerInset: leftDangerInset)
-                            .frame(width: leftWidth, height: leftTopHeight)
-                            .background(speechManager.selectedTheme.backgroundColor)
-
-                        horizontalDragHandle
-                            .frame(width: leftWidth, height: dividerHitThickness)
-                            .contentShape(Rectangle())
-                            .highPriorityGesture(
-                                DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                                    .onChanged { value in
-                                        if leftVerticalSplitDragStart == nil {
-                                            leftVerticalSplitDragStart = leftVerticalSplit
-                                        }
-                                        guard let start = leftVerticalSplitDragStart else { return }
-                                        let delta = value.translation.height / leftContentHeight
-                                        withTransaction(Transaction(animation: nil)) {
-                                            leftVerticalSplit = clamp(
-                                                value: start + delta,
-                                                minValue: minPaneHeight / leftContentHeight,
-                                                maxValue: 1 - (minPaneHeight / leftContentHeight)
-                                            )
-                                        }
-                                    }
-                                    .onEnded { _ in leftVerticalSplitDragStart = nil }
-                            )
-
-                        MemoView()
-                            .frame(width: leftWidth, height: leftBottomHeight)
-                            .background(Color(.systemBackground))
-                    }
-
-                    // MARK: - 좌우 드래그 핸들
-                    verticalDragHandle
-                        .frame(width: dividerHitThickness, height: totalHeight)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                                .onChanged { value in
-                                    if horizontalSplitDragStart == nil {
-                                        horizontalSplitDragStart = horizontalSplit
-                                    }
-                                    guard let start = horizontalSplitDragStart else { return }
-                                    let delta = value.translation.width / (totalWidth - dividerHitThickness)
-                                    withTransaction(Transaction(animation: nil)) {
-                                        horizontalSplit = clamp(
-                                            value: start + delta,
-                                            minValue: minPaneWidth / (totalWidth - dividerHitThickness),
-                                            maxValue: 1 - (minPaneWidth / (totalWidth - dividerHitThickness))
-                                        )
-                                    }
-                                }
-                                .onEnded { _ in horizontalSplitDragStart = nil }
-                        )
-
-                    // MARK: - 오른쪽: 파일뷰어 + 사전
-                    VStack(spacing: 0) {
-                        ZStack(alignment: .bottomLeading) {
-                            FileViewerView()
-                                .frame(width: rightWidth, height: rightTopHeight)
-                                .background(Color(.systemBackground))
-
-                            // 연한 회색 스타일의 파일 추가 버튼
-                            Button {
-                                pickFileFromFloating()
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 24, height: 24) // 크기를 살짝 줄여 더 깔끔하게
-                                    .foregroundColor(Color(.systemGray3)) // 연한 회색 설정
-                                    .background(Circle().fill(Color(.systemBackground))) // 배경과 어우러지는 배경색
-                                    .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
-                            }
-                            .padding(.leading, 10)
-                            .padding(.bottom, 10)
-                            .buttonStyle(.plain)
-                        }
-
-                        horizontalDragHandle
-                            .frame(width: rightWidth, height: dividerHitThickness)
-                            .contentShape(Rectangle())
-                            .highPriorityGesture(
-                                DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                                    .onChanged { value in
-                                        if rightVerticalSplitDragStart == nil {
-                                            rightVerticalSplitDragStart = rightVerticalSplit
-                                        }
-                                        guard let start = rightVerticalSplitDragStart else { return }
-                                        let delta = value.translation.height / rightContentHeight
-                                        withTransaction(Transaction(animation: nil)) {
-                                            rightVerticalSplit = clamp(
-                                                value: start + delta,
-                                                minValue: minPaneHeight / rightContentHeight,
-                                                maxValue: 1 - (minPaneHeight / rightContentHeight)
-                                            )
-                                        }
-                                    }
-                                    .onEnded { _ in rightVerticalSplitDragStart = nil }
-                            )
-
-                        DictionaryView()
-                            .frame(width: rightWidth, height: rightBottomHeight)
-                            .background(Color(.systemBackground))
-                    }
-                }
-                .frame(width: totalWidth, height: totalHeight)
+        var activeColor: Color {
+            switch self {
+            case .dictionary: return AppColors.tabDictionary
+            case .file: return AppColors.tabFile
+            case .web: return AppColors.tabWeb
+            case .memo: return AppColors.tabMemo
             }
-            .ignoresSafeArea()
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { dismissKeyboard() }
-                }
-            }
-            .onAppear {
-                speechManager.requestPermissions()
-                speechManager.glossaryStore = glossaryStore
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView(speechManager: speechManager)
-            }
-            .sheet(isPresented: $showGlossary) {
-                GlossaryView(glossaryStore: glossaryStore)
-            }
-            .onAppear {
-                            speechManager.requestPermissions()
-                            speechManager.glossaryStore = glossaryStore
-                            speechManager.currencyConverter = currencyConverter
-                            currencyConverter.fetchRates()
-                        }
+        }
+    }
+    @State private var selectedPanelTab: RightPanelTab = .dictionary
 
-            // MARK: - 플로팅 메뉴바
-            floatingMenuBar
+    @State private var previewFileURL: URL? = nil
+    @State private var previewBookmarkData: Data? = nil
+    @State private var memoText: String = ""
 
-            // 언어 경고 alert (ZStack 최상위, sheet와 분리)
-            Color.clear
-                .frame(width: 0, height: 0)
-                .alert("언어 변경", isPresented: $showLanguageAlert) {
-                    Button("확인", role: .cancel) {}
-                } message: {
-                    Text("녹음을 정지한 후 언어를 변경해 주세요")
-                }
-                .alert("Booth 변경", isPresented: $showBoothAlert) {
-                    Button("확인", role: .cancel) {}
-                } message: {
-                    Text("녹음을 정지한 후 Booth를 변경해 주세요")
-                }
+    // 현재 Booth 색깔
+    private var boothColor: Color {
+        switch speechManager.selectedBooth {
+        case .kr: return AppColors.boothKR
+        case .cn: return AppColors.boothCN
+        case .jp: return AppColors.boothJP
         }
     }
 
-    // MARK: - Floating Menu Bar
+    var body: some View {
+        GeometryReader { geo in
+            let totalWidth = geo.size.width
+            let totalHeight = geo.size.height
+            let isLandscape = totalWidth > totalHeight
+            let safeLeading = geo.safeAreaInsets.leading
+            let safeTop = geo.safeAreaInsets.top
+            let safeBottom = geo.safeAreaInsets.bottom
+            let leftInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
+            let menuBarHeight: CGFloat = 48
 
-    private var floatingMenuBar: some View {
-            let totalOffset = CGSize(
-                width: floatingBarOffset.width + floatingBarDragOffset.width,
-                height: floatingBarOffset.height + floatingBarDragOffset.height
-            )
+            let subtitleWidth = showRightPanel ? totalWidth * 0.65 : totalWidth
+            let panelWidth = totalWidth * 0.35
 
-            return HStack(spacing: 8) {
-                Group {
-                    // Boothmate 로고
-                    VStack(spacing: 0) {
-                        Text("Boothmate")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.gray)
-                        Text("v1.0")
-                            .font(.system(size: 7, weight: .medium))
-                            .foregroundColor(.gray.opacity(0.6))
-                    }
+            VStack(spacing: 0) {
+                // 상단 safe area
+                Color(.systemBackground)
+                    .frame(height: safeTop)
 
-                    // 1. Start/Stop
-                    recordButton
+                // 콘텐츠
+                HStack(spacing: 0) {
+                    subtitleArea(leftInset: leftInset)
+                        .frame(width: subtitleWidth)
+                        .background(speechManager.selectedTheme.backgroundColor)
 
-                    // 2. Booth 토글 (탭하면 KR→CN→JP 순환)
-                    boothToggle
+                    if showRightPanel {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 1)
 
-                    // 3. 언어 토글
-                    languageToggle
-
-                    // 4. 확장 화살표
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            menuExpanded.toggle()
-                        }
-                    } label: {
-                        Image(systemName: menuExpanded ? "chevron.left" : "chevron.right")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.primary)
-                            .frame(width: 24, height: 32)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    // --- 여기서부터는 확장(menuExpanded)되어야 보이는 메뉴 ---
-                    if menuExpanded {
-                        // 5. 지우기
-                        Button {
-                            speechManager.clearSubtitles()
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.primary)
-                                .frame(width: 32, height: 32)
-                        }
-                        .buttonStyle(.plain)
-
-                        // 6. 글로서리
-                        Button { showGlossary = true } label: {
-                            Image(systemName: "text.book.closed")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.primary)
-                                .frame(width: 32, height: 32)
-                        }
-                        .buttonStyle(.plain)
-
-                        // 7. 폰트 크기
-                        Button { speechManager.cycleFontSize() } label: {
-                            HStack(spacing: 0) {
-                                Text("A").font(.system(size: 13, weight: .medium))
-                                Text("A").font(.system(size: 20, weight: .bold))
-                            }
-                            .foregroundColor(.primary)
-                            .frame(width: 38, height: 32)
-                        }
-                        .buttonStyle(.plain)
-
-                        // 8. 설정
-                        Button { showSettings = true } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.primary)
-                                .frame(width: 32, height: 32)
-                        }
-                        .buttonStyle(.plain)
+                        rightPanel
+                            
+                            .frame(width: panelWidth)
+                            .background(Color(.systemBackground))
                     }
                 }
-                .allowsHitTesting(!isDraggingBar)
-                .opacity(isDraggingBar ? 0.4 : 1.0)
+
+                // 하단 메뉴바
+                Divider()
+
+                bottomMenuBar(leftInset: leftInset)
+                    .frame(height: menuBarHeight)
+                    .background(Color(.systemBackground))
+
+                Color(.systemBackground)
+                    .frame(height: safeBottom)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-            .offset(x: totalOffset.width, y: totalOffset.height)
-            .transaction { t in t.animation = nil }        .highPriorityGesture(
-            DragGesture(minimumDistance: 8, coordinateSpace: .global)
-                .onChanged { value in
-                    isDraggingBar = true
-                    floatingBarDragOffset = CGSize(
-                        width: value.translation.width,
-                        height: value.translation.height
-                    )
-                }
-                .onEnded { value in
-                    floatingBarOffset = CGSize(
-                        width: floatingBarOffset.width + value.translation.width,
-                        height: floatingBarOffset.height + value.translation.height
-                    )
-                    floatingBarDragOffset = .zero
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        isDraggingBar = false
+            .frame(width: totalWidth, height: totalHeight)
+        }
+        .ignoresSafeArea()
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { dismissKeyboard() }
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(speechManager: speechManager)
+        }
+        .sheet(isPresented: $showGlossary) {
+            GlossaryView(glossaryStore: glossaryStore)
+        }
+        .onAppear {
+            speechManager.glossaryStore = glossaryStore
+            speechManager.currencyConverter = currencyConverter
+            DispatchQueue.global(qos: .utility).async {
+                SFSpeechRecognizer.requestAuthorization { _ in }
+                AVAudioApplication.requestRecordPermission { _ in }
+            }
+            currencyConverter.fetchRates()
+            sendBoothChangedNotification()
+        }
+        .alert("언어 변경", isPresented: $showLanguageAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("녹음을 정지한 후 언어를 변경해 주세요")
+        }
+        .alert("Booth 변경", isPresented: $showBoothAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("녹음을 정지한 후 Booth를 변경해 주세요")
+        }
+    }
+
+    private var rightPanel: some View {
+        VStack(spacing: 0) {
+            Spacer().frame(height: 24)
+            // 패널 탭 바 (파스텔 색깔)
+            HStack(spacing: 0) {
+                ForEach(RightPanelTab.allCases, id: \.self) { tab in
+                    Button {
+                        selectedPanelTab = tab
+                    } label: {
+                        Text(tab.rawValue)
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 7)
+                            .background(selectedPanelTab == tab ? tab.activeColor : Color.gray.opacity(0.08))
+                            .foregroundColor(selectedPanelTab == tab ? .black.opacity(0.8) : .primary.opacity(0.5))
                     }
                 }
-        )
+            }
+
+            switch selectedPanelTab {
+            case .dictionary: DictionaryView()
+            case .file: FilePreviewPanel(fileURL: $previewFileURL, bookmarkData: $previewBookmarkData)
+            case .web: WebBrowserPanel()
+            case .memo: MemoPanel(text: $memoText)
+            }
+        }
+    }
+
+    // MARK: - Booth 변경 알림
+
+    private func sendBoothChangedNotification() {
+        let boothLanguage: String
+        switch speechManager.selectedBooth {
+        case .kr: boothLanguage = "en-US"
+        case .cn: boothLanguage = "zh-CN"
+        case .jp: boothLanguage = "ja-JP"
+        }
+        NotificationCenter.default.post(name: .boothChanged, object: boothLanguage)
+    }
+
+    // MARK: - Bottom Menu Bar
+
+    private func bottomMenuBar(leftInset: CGFloat) -> some View {
+        HStack(spacing: 8) {
+            VStack(spacing: 0) {
+                Text("Boothmate")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.gray)
+                Text("v1.0")
+                    .font(.system(size: 7, weight: .medium))
+                    .foregroundColor(.gray.opacity(0.6))
+            }
+
+            recordButton
+            boothToggle
+            languageToggle
+
+            Button { speechManager.clearSubtitles() } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppColors.menuIcon)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+
+            Button { showGlossary = true } label: {
+                Image(systemName: "text.book.closed")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(AppColors.menuIcon)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+
+            Button { speechManager.cycleFontSize() } label: {
+                HStack(spacing: 0) {
+                    Text("A").font(.system(size: 13, weight: .medium))
+                    Text("A").font(.system(size: 20, weight: .bold))
+                }
+                .foregroundColor(AppColors.menuIcon)
+                .frame(width: 38, height: 32)
+            }
+            .buttonStyle(.plain)
+
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(AppColors.menuIcon)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+
+            // 패널 토글 (동일 색상)
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showRightPanel.toggle()
+                }
+            } label: {
+                Image(systemName: "sidebar.trailing")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(showRightPanel ? AppColors.menuIcon : AppColors.menuIcon)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+        }
+        .padding(.leading, 12 + leftInset)
+        .padding(.trailing, 12)
     }
 
     // MARK: - Booth Toggle
@@ -347,8 +268,8 @@ struct ContentView: View {
                 showBoothAlert = true
             } else {
                 speechManager.selectedBooth = speechManager.selectedBooth.next
-                // Booth 변경 시 기본 언어로 리셋
                 speechManager.selectedLanguage = speechManager.selectedBooth.defaultLanguage
+                sendBoothChangedNotification()
             }
         } label: {
             Text(speechManager.selectedBooth.rawValue)
@@ -356,7 +277,7 @@ struct ContentView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
-                .background(Color.blue.opacity(0.8))
+                .background(boothColor)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
@@ -378,7 +299,7 @@ struct ContentView: View {
                     Text(name)
                         .font(.system(size: 12, weight: .semibold))
                         .frame(width: 32, height: 28)
-                        .background(speechManager.selectedLanguage == code ? Color.blue : Color.clear)
+                        .background(speechManager.selectedLanguage == code ? boothColor : Color.clear)
                         .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
                 }
             }
@@ -392,11 +313,7 @@ struct ContentView: View {
 
     private var recordButton: some View {
         Button {
-            if speechManager.isRecording {
-                speechManager.stopRecording()
-            } else {
-                speechManager.startRecording()
-            }
+            speechManager.isRecording ? speechManager.stopRecording() : speechManager.startRecording()
         } label: {
             ZStack {
                 Circle()
@@ -424,98 +341,74 @@ struct ContentView: View {
 
     // MARK: - Subtitle Area
 
-    private func subtitleArea(leftDangerInset: CGFloat) -> some View {
-            ZStack(alignment: .topTrailing) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: speechManager.lineSpacing) {
-                            ForEach(speechManager.subtitles.indices, id: \.self) { index in
-                                subtitleBlock(text: speechManager.subtitles[index], opacity: 1.0, leftDangerInset: leftDangerInset)
-                                    .id(index)
-                            }
+    private func subtitleArea(leftInset: CGFloat) -> some View {
+        ZStack(alignment: .topTrailing) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: speechManager.lineSpacing) {
+                        Color.clear.frame(height: 20)
 
-                            if !speechManager.currentText.isEmpty {
-                                subtitleBlock(text: speechManager.currentText, opacity: 0.65, leftDangerInset: leftDangerInset)
-                                    .id("current")
-                            }
-
-                            Color.clear.frame(height: 1).id("bottomAnchor")
+                        ForEach(Array(speechManager.subtitles.enumerated()), id: \.offset) { index, subtitle in
+                            subtitleBlock(text: subtitle, leftInset: leftInset)
+                                .id(index)
                         }
-                        .padding(.top, 8)
-                        .padding(.bottom, 16)
-                    }
-                    .onAppear { scrollToBottom(proxy) }
-                    .onChange(of: speechManager.currentText) { _ in scrollToBottom(proxy) }
-                    .onChange(of: speechManager.subtitles.count) { _ in scrollToBottom(proxy) }
-                }
 
-                // Azure 로고
-                if speechManager.useAzure && speechManager.isRecording {
-                    AzureBadge()
-                        .padding(.trailing, 12)
-                        .padding(.top, 12)
+                        if !speechManager.currentText.isEmpty {
+                            subtitleBlock(text: speechManager.currentText, leftInset: leftInset)
+                                .id("current")
+                        }
+
+                        Color.clear.frame(height: 30).id("bottomAnchor")
+                    }
+                }
+                .onChange(of: speechManager.scrollTrigger) {
+                    proxy.scrollTo("bottomAnchor", anchor: .bottom)
                 }
             }
+
+            if speechManager.useAzure && speechManager.isRecording {
+                AzureBadge()
+                    .padding(.trailing, 12)
+                    .padding(.top, 12)
+            }
         }
-    private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        proxy.scrollTo("bottomAnchor", anchor: .bottom)
     }
 
     // MARK: - Subtitle Block
-        private func subtitleBlock(text: String, opacity: Double, leftDangerInset: CGFloat) -> some View {
-            TappableText(
-                text: text,
-                fontSize: speechManager.fontSize,
-                textColor: speechManager.selectedTheme.textColor.opacity(opacity),
-                // 순서 변경: glossaryColor와 lineSpacing을 먼저 씁니다.
-                glossaryColor: speechManager.glossaryEnabled
-                    ? speechManager.glossaryColor.color
-                    : speechManager.selectedTheme.textColor.opacity(opacity),
-                lineSpacing: speechManager.lineSpacing,
-                glossaryStore: glossaryStore  // glossaryStore를 뒤로 보냈습니다.
-            ) { word in
-                // Booth 모드에 따라 적절한 사전으로 검색
+
+    private func subtitleBlock(text: String, leftInset: CGFloat) -> some View {
+        TappableText(
+            text: text,
+            fontSize: speechManager.fontSize,
+            textColor: speechManager.selectedTheme.textColor,
+            glossaryColor: speechManager.glossaryEnabled
+                ? speechManager.glossaryColor.color
+                : speechManager.selectedTheme.textColor,
+            lineSpacing: speechManager.lineSpacing,
+            glossaryEnabled: speechManager.glossaryEnabled,
+            onTapWord: { word in
                 let dicLanguage: String
                 switch speechManager.selectedBooth {
-                case .kr: dicLanguage = "en-US"   // 한영/영한 사전
-                case .cn: dicLanguage = "zh-CN"   // 한중/중한 사전
-                case .jp: dicLanguage = "ja-JP"   // 한일/일한 사전
+                case .kr: dicLanguage = "en-US"
+                case .cn: dicLanguage = "zh-CN"
+                case .jp: dicLanguage = "ja-JP"
                 }
                 NotificationCenter.default.post(
                     name: .searchDictionary,
                     object: word,
                     userInfo: ["language": dicLanguage]
                 )
+                if !showRightPanel {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showRightPanel = true
+                    }
+                }
+                selectedPanelTab = .dictionary
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 20 + leftDangerInset)
-            .padding(.trailing, 20)
-        }
-
-    // MARK: - Drag Handles
-
-    private var verticalDragHandle: some View {
-        ZStack {
-            Rectangle().fill(Color.clear)
-            Rectangle().fill(Color.gray.opacity(0.14)).frame(width: visibleDividerThickness)
-            Capsule().fill(Color.gray.opacity(0.55)).frame(width: 4, height: 34)
-        }
-        .contentShape(Rectangle())
-    }
-
-    private var horizontalDragHandle: some View {
-        ZStack {
-            Rectangle().fill(Color.clear)
-            Rectangle().fill(Color.gray.opacity(0.14)).frame(height: visibleDividerThickness)
-            Capsule().fill(Color.gray.opacity(0.55)).frame(width: 34, height: 4)
-        }
-        .contentShape(Rectangle())
-    }
-
-    // MARK: - Helpers
-
-    private func pickFileFromFloating() {
-        NotificationCenter.default.post(name: .openFilePicker, object: nil)
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 20 + leftInset)
+        .padding(.trailing, 20)
     }
 
     private func dismissKeyboard() {
@@ -524,32 +417,258 @@ struct ContentView: View {
             to: nil, from: nil, for: nil
         )
     }
+}
 
-    private func clamp(value: CGFloat, minValue: CGFloat, maxValue: CGFloat) -> CGFloat {
-        min(max(value, minValue), maxValue)
+// MARK: - 메모 패널
+
+struct MemoPanel: View {
+    @Binding var text: String
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("메모")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.gray)
+                Spacer()
+                Text("\(text.count)자")
+                    .font(.system(size: 10))
+                    .foregroundColor(.gray.opacity(0.6))
+                if !text.isEmpty {
+                    Button { text = "" } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.gray.opacity(0.08))
+
+            TextEditor(text: $text)
+                .font(.system(size: 14))
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .padding(.horizontal, 6)
+                .padding(.top, 4)
+        }
     }
 }
 
-struct AzureBadge: View {
-    @State private var glowing = false
+// MARK: - 파일 프리뷰 패널
+
+struct FilePreviewPanel: View {
+    @Binding var fileURL: URL?
+    @Binding var bookmarkData: Data?
+    @State private var showFilePicker = false
+    @State private var previewID = UUID()
 
     var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                if let url = fileURL {
+                    Image(systemName: iconForFile(url))
+                        .font(.system(size: 12))
+                        .foregroundColor(.blue)
+                    Text(url.lastPathComponent)
+                        .font(.system(size: 11))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+                Button { showFilePicker = true } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 12))
+                        Text("파일 열기")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.blue)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color.gray.opacity(0.08))
+
+            if let url = resolveFileURL() {
+                QuickLookPreview(url: url).id(previewID)
+            } else {
+                VStack {
+                    Spacer()
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 32))
+                        .foregroundColor(.gray.opacity(0.4))
+                        .padding(.bottom, 8)
+                    Text("파일을 선택하세요")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                    Spacer()
+                }
+            }
+        }
+        .sheet(isPresented: $showFilePicker) {
+            DocumentPicker { url in
+                if let bookmark = try? url.bookmarkData(
+                    options: .minimalBookmark,
+                    includingResourceValuesForKeys: nil, relativeTo: nil
+                ) { bookmarkData = bookmark }
+                fileURL = url
+                previewID = UUID()
+            }
+        }
+    }
+
+    private func resolveFileURL() -> URL? {
+        if let url = fileURL {
+            if url.startAccessingSecurityScopedResource() { return url }
+        }
+        if let data = bookmarkData {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                _ = url.startAccessingSecurityScopedResource()
+                if isStale {
+                    bookmarkData = try? url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+                }
+                fileURL = url
+                return url
+            }
+        }
+        return nil
+    }
+
+    private func iconForFile(_ url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "pdf": return "doc.richtext"
+        case "doc", "docx": return "doc.text"
+        case "xls", "xlsx": return "tablecells"
+        case "ppt", "pptx": return "rectangle.stack"
+        case "txt", "rtf": return "doc.plaintext"
+        case "jpg", "jpeg", "png", "gif", "heic": return "photo"
+        case "csv": return "tablecells"
+        default: return "doc"
+        }
+    }
+}
+
+// MARK: - QuickLook Preview
+
+struct QuickLookPreview: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let c = QLPreviewController(); c.dataSource = context.coordinator; return c
+    }
+    func updateUIViewController(_ c: QLPreviewController, context: Context) {
+        context.coordinator.url = url; c.reloadData()
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(url: url) }
+    class Coordinator: NSObject, QLPreviewControllerDataSource {
+        var url: URL
+        init(url: URL) { self.url = url }
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { url as QLPreviewItem }
+    }
+}
+
+// MARK: - Document Picker
+
+struct DocumentPicker: UIViewControllerRepresentable {
+    var onPick: (URL) -> Void
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.pdf, .plainText, .rtf, .spreadsheet, .presentation, .image, .data])
+        picker.delegate = context.coordinator; picker.allowsMultipleSelection = false; return picker
+    }
+    func updateUIViewController(_ c: UIDocumentPickerViewController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        var onPick: (URL) -> Void
+        init(onPick: @escaping (URL) -> Void) { self.onPick = onPick }
+        func documentPicker(_ c: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            if let url = urls.first { _ = url.startAccessingSecurityScopedResource(); onPick(url) }
+        }
+    }
+}
+
+// MARK: - 웹 브라우저 패널
+
+struct WebBrowserPanel: View {
+    @State private var urlText: String = ""
+    @State private var currentURL: URL? = nil
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                TextField("URL 입력", text: $urlText)
+                    .font(.system(size: 12))
+                    .textFieldStyle(.roundedBorder)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .onSubmit { loadURL() }
+                Button { loadURL() } label: {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+
+            if let url = currentURL {
+                WebBrowserWebView(url: url)
+            } else {
+                VStack {
+                    Spacer()
+                    Image(systemName: "globe").font(.system(size: 32)).foregroundColor(.gray.opacity(0.4)).padding(.bottom, 8)
+                    Text("URL을 입력하세요").font(.system(size: 14)).foregroundColor(.gray)
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    private func loadURL() {
+        var input = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else { return }
+        if !input.hasPrefix("http://") && !input.hasPrefix("https://") { input = "https://" + input }
+        if let url = URL(string: input) { currentURL = url }
+    }
+}
+
+struct WebBrowserWebView: UIViewRepresentable {
+    let url: URL
+    func makeUIView(context: Context) -> WKWebView {
+        let w = WKWebView(); w.allowsBackForwardNavigationGestures = true
+        w.scrollView.keyboardDismissMode = .onDrag; w.load(URLRequest(url: url)); return w
+    }
+    func updateUIView(_ w: WKWebView, context: Context) {
+        if w.url?.absoluteString != url.absoluteString { w.load(URLRequest(url: url)) }
+    }
+}
+
+// MARK: - Azure Badge
+
+struct AzureBadge: View {
+    @State private var glowing = false
+    var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: "cloud.fill")
-                .font(.system(size: 10))
-            Text("Azure")
-                .font(.system(size: 9, weight: .semibold))
+            Image(systemName: "cloud.fill").font(.system(size: 10))
+            Text("Azure").font(.system(size: 9, weight: .semibold))
         }
         .foregroundColor(.blue)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 8).padding(.vertical, 4)
         .background(Color.blue.opacity(0.1))
         .clipShape(Capsule())
         .opacity(glowing ? 1.0 : 0.4)
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                glowing = true
-            }
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) { glowing = true }
         }
     }
 }

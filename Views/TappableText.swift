@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct TappableText: UIViewRepresentable {
     let text: String
@@ -6,8 +7,10 @@ struct TappableText: UIViewRepresentable {
     let textColor: Color
     let glossaryColor: Color
     let lineSpacing: CGFloat
-    let glossaryStore: GlossaryStore
+    let glossaryEnabled: Bool
     let onTapWord: (String) -> Void
+
+    // MARK: - UIViewRepresentable
 
     func makeUIView(context: Context) -> UILabel {
         let label = UILabel()
@@ -16,29 +19,45 @@ struct TappableText: UIViewRepresentable {
         label.lineBreakMode = .byWordWrapping
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleTap(_:))
+        )
         label.addGestureRecognizer(tap)
-
         return label
     }
 
     func updateUIView(_ label: UILabel, context: Context) {
         label.attributedText = buildAttributedString()
-        label.preferredMaxLayoutWidth = label.bounds.width > 0 ? label.bounds.width : UIScreen.main.bounds.width * 0.4
-        context.coordinator.text = text
+        if label.bounds.width > 0 {
+            label.preferredMaxLayoutWidth = label.bounds.width
+        }
         context.coordinator.onTapWord = onTapWord
     }
+
+    // MARK: - Attributed String
+    //
+    // 괄호 색깔 규칙:
+    // 1. 환산: 숫자+단위(변환) → 괄호 안만 glossaryColor, 앞 단위는 기본색
+    //    - "7 feet(2.1m)" → feet 기본색, (2.1m) glossaryColor
+    //    - "$20,000(₩약 3,021만원)" → $20,000 기본색, (₩약...) glossaryColor
+    //    - "10,000,000 km(6,213,727miles)" → km 기본색, (...) glossaryColor
+    // 2. 글로서리: 단어(번역) → 전체 glossaryColor
 
     private func buildAttributedString() -> NSAttributedString {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineSpacing = lineSpacing
 
-        // 1. 속성 정의
         let baseAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: .medium),
             .foregroundColor: UIColor(textColor),
             .paragraphStyle: paragraphStyle
         ]
+
+        let result = NSMutableAttributedString(string: text, attributes: baseAttrs)
+        let nsText = text as NSString
+
+        guard glossaryEnabled else { return result }
 
         let glossaryAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: .medium),
@@ -46,111 +65,81 @@ struct TappableText: UIViewRepresentable {
             .paragraphStyle: paragraphStyle
         ]
 
-        // 2. 기존 중복 괄호 청소 (실시간 인식 시 이미 붙은 괄호 제거)
-        var cleanedText = text
-        let bracketPattern = "\\s?\\([가-힣A-Za-z\\s\\.,?!]+\\)"
-        if let regex = try? NSRegularExpression(pattern: bracketPattern) {
-            cleanedText = regex.stringByReplacingMatches(
-                in: cleanedText,
-                range: NSRange(cleanedText.startIndex..., in: cleanedText),
-                withTemplate: ""
-            )
-        }
+        // 환산 패턴: 괄호 앞에 숫자가 있는 경우 (공백 허용)
+        // 예: "$20,000(₩약...)", "7 feet(2.1m)", "10,000,000 km(6,213,727miles)"
+        // 매칭: [숫자/통화/콤마/소수점][공백?][단위?](괄호내용)
+        guard let conversionRegex = try? NSRegularExpression(
+            pattern: "(?:[\\d,.]+[\\s]?[A-Za-z°]*|[$₩¥€£][\\d,.]+)\\([^)]+\\)",
+            options: []
+        ) else { return result }
 
-        var workingText = cleanedText
-        var replacements: [String: (display: String, translation: String)] = [:]
-        
-        // 3. 매칭 대상 데이터 준비
-        struct MatchPair {
-            let search: String
-            let result: String
-        }
-        
-        var allPairs: [MatchPair] = []
-        for entry in glossaryStore.entries {
-            allPairs.append(MatchPair(search: entry.source, result: entry.target))
-            allPairs.append(MatchPair(search: entry.target, result: entry.source))
-            for syn in entry.synonyms {
-                if !syn.isEmpty {
-                    allPairs.append(MatchPair(search: syn, result: entry.target))
+        // 글로서리 패턴: 비숫자 단어(괄호내용)
+        guard let allParenRegex = try? NSRegularExpression(
+            pattern: "\\S+\\([^)]+\\)",
+            options: []
+        ) else { return result }
+
+        // 1단계: 환산 괄호 처리 (괄호 안만 색칠)
+        let conversionMatches = conversionRegex.matches(
+            in: text, range: NSRange(location: 0, length: nsText.length)
+        )
+        var conversionRanges = Set<Int>() // 환산으로 처리된 위치 기록
+
+        for match in conversionMatches {
+            let matchedStr = nsText.substring(with: match.range)
+            if let parenStart = matchedStr.firstIndex(of: "(") {
+                let parenOffset = matchedStr.distance(from: matchedStr.startIndex, to: parenStart)
+                let parenRange = NSRange(
+                    location: match.range.location + parenOffset,
+                    length: match.range.length - parenOffset
+                )
+                result.addAttributes(glossaryAttrs, range: parenRange)
+
+                // 이 범위는 환산으로 처리됨
+                for i in match.range.location..<(match.range.location + match.range.length) {
+                    conversionRanges.insert(i)
                 }
             }
         }
-        
-        // 긴 단어부터 매칭하여 복합어 우선 처리
-        let sortedPairs = allPairs.sorted { $0.search.count > $1.search.count }
 
-        for (index, pair) in sortedPairs.enumerated() {
-            let strippedSource = pair.search.replacingOccurrences(of: " ", with: "")
-            let flexiblePattern = strippedSource.map { NSRegularExpression.escapedPattern(for: String($0)) }.joined(separator: "\\s?")
-            
-            // 조사 허용 및 경계 체크
-            let pattern = "(?<![A-Za-z0-9가-힣])\(flexiblePattern)(?![A-Za-z0-9])"
-            
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { continue }
-            
-            let placeholder = "__GLO_\(index)__"
-            let range = NSRange(workingText.startIndex..., in: workingText)
-            
-            if let match = regex.firstMatch(in: workingText, range: range) {
-                let originalInText = (workingText as NSString).substring(with: match.range)
-                workingText = regex.stringByReplacingMatches(in: workingText, range: range, withTemplate: placeholder)
-                replacements[placeholder] = (originalInText, pair.result)
-            }
+        // 2단계: 글로서리 괄호 처리 (환산이 아닌 것만 전체 색칠)
+        let allMatches = allParenRegex.matches(
+            in: text, range: NSRange(location: 0, length: nsText.length)
+        )
+
+        for match in allMatches {
+            // 이미 환산으로 처리된 범위면 스킵
+            if conversionRanges.contains(match.range.location) { continue }
+
+            result.addAttributes(glossaryAttrs, range: match.range)
         }
 
-        // 4. 최종 조립
-        let finalResult = NSMutableAttributedString()
-        let finalRegex = try! NSRegularExpression(pattern: "__GLO_\\d+__")
-        let nsWorkingText = workingText as NSString
-        var lastIndex = 0
-
-        finalRegex.enumerateMatches(in: workingText, range: NSRange(location: 0, length: nsWorkingText.length)) { match, _, _ in
-            if let matchRange = match?.range {
-                let preRange = NSRange(location: lastIndex, length: matchRange.location - lastIndex)
-                if preRange.length > 0 {
-                    finalResult.append(NSAttributedString(string: nsWorkingText.substring(with: preRange), attributes: baseAttrs))
-                }
-                
-                let placeholder = nsWorkingText.substring(with: matchRange)
-                if let data = replacements[placeholder] {
-                    let coloredWord = NSMutableAttributedString(string: data.display, attributes: glossaryAttrs)
-                    let translation = NSAttributedString(string: "(\(data.translation))", attributes: glossaryAttrs)
-                    coloredWord.append(translation)
-                    finalResult.append(coloredWord)
-                }
-                lastIndex = matchRange.location + matchRange.length
-            }
-        }
-        
-        if lastIndex < nsWorkingText.length {
-            finalResult.append(NSAttributedString(string: nsWorkingText.substring(from: lastIndex), attributes: baseAttrs))
-        }
-
-        return finalResult
+        return result
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: text, onTapWord: onTapWord)
+        Coordinator(onTapWord: onTapWord)
     }
 
+    // MARK: - Coordinator
+
     class Coordinator: NSObject {
-        var text: String
         var onTapWord: (String) -> Void
 
-        init(text: String, onTapWord: @escaping (String) -> Void) {
-            self.text = text
+        init(onTapWord: @escaping (String) -> Void) {
             self.onTapWord = onTapWord
         }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            guard let label = gesture.view as? UILabel, let attributedText = label.attributedText else { return }
-            
+            guard let label = gesture.view as? UILabel,
+                  let attributedText = label.attributedText else { return }
+
             let point = gesture.location(in: label)
+
             let textStorage = NSTextStorage(attributedString: attributedText)
             let layoutManager = NSLayoutManager()
             let textContainer = NSTextContainer(size: label.bounds.size)
-            
+
             textContainer.lineFragmentPadding = 0
             textContainer.maximumNumberOfLines = label.numberOfLines
             textContainer.lineBreakMode = label.lineBreakMode
@@ -158,7 +147,11 @@ struct TappableText: UIViewRepresentable {
             layoutManager.addTextContainer(textContainer)
             textStorage.addLayoutManager(layoutManager)
 
-            let index = layoutManager.characterIndex(for: point, in: textContainer, fractionOfDistanceBetweenInsertionPoints: nil)
+            let index = layoutManager.characterIndex(
+                for: point,
+                in: textContainer,
+                fractionOfDistanceBetweenInsertionPoints: nil
+            )
             guard index < attributedText.length else { return }
 
             let nsText = attributedText.string as NSString
@@ -177,17 +170,22 @@ struct TappableText: UIViewRepresentable {
             }
 
             let word = nsText.substring(with: NSRange(location: wordStart, length: wordEnd - wordStart))
-            let cleaned = word.trimmingCharacters(in: .punctuationCharacters)
-                             .replacingOccurrences(of: "(", with: "")
-                             .replacingOccurrences(of: ")", with: "")
+            let cleaned = word
+                .replacingOccurrences(of: "\\([^)]*\\)", with: "", options: .regularExpression)
+                .trimmingCharacters(in: .punctuationCharacters)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
 
             if !cleaned.isEmpty {
                 let highlightRange = NSRange(location: wordStart, length: wordEnd - wordStart)
                 let highlighted = NSMutableAttributedString(attributedString: attributedText)
-                highlighted.addAttribute(.backgroundColor, value: UIColor.systemYellow.withAlphaComponent(0.4), range: highlightRange)
+                highlighted.addAttribute(
+                    .backgroundColor,
+                    value: UIColor.systemYellow.withAlphaComponent(0.4),
+                    range: highlightRange
+                )
                 label.attributedText = highlighted
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     label.attributedText = attributedText
                 }
 
