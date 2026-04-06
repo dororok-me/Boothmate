@@ -21,12 +21,12 @@ struct DictionaryView: View {
 
         // Booth 색깔과 동일: 영어=주황, 일어=푸른, 중어=붉은
         var activeColor: Color {
-            switch self {
-            case .eng: return Color.orange
-            case .jp: return Color(red: 0.3, green: 0.5, blue: 0.9)  // 푸른색
-            case .ch: return Color(red: 0.9, green: 0.3, blue: 0.35) // 붉은색
-            }
-        }
+                    switch self {
+                    case .eng: return .blue
+                    case .jp: return .black
+                    case .ch: return .red
+                    }
+                }
     }
 
     var body: some View {

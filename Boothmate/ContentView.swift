@@ -13,9 +13,9 @@ struct AppColors {
     static let menuIcon = Color.primary.opacity(0.9)
 
     // Booth 색깔
-    static let boothKR = Color.orange
-    static let boothCN = Color(red: 0.9, green: 0.3, blue: 0.35)
-    static let boothJP = Color(red: 0.3, green: 0.5, blue: 0.9)
+    static let boothKR = Color.blue
+    static let boothCN = Color.red
+    static let boothJP = Color.black
 
     // 우측 패널 탭 파스텔 색깔
     static let tabDictionary = Color(red: 0.6, green: 0.82, blue: 0.88)  // 파스텔 하늘
@@ -37,20 +37,29 @@ struct ContentView: View {
     @State private var showRightPanel = true
 
     enum RightPanelTab: String, CaseIterable {
-        case dictionary = "사전"
-        case file = "파일"
-        case web = "웹"
-        case memo = "메모"
+            case dictionary = "사전"
+            case file = "파일"
+            case web = "웹"
+            case memo = "메모"
 
-        var activeColor: Color {
-            switch self {
-            case .dictionary: return AppColors.tabDictionary
-            case .file: return AppColors.tabFile
-            case .web: return AppColors.tabWeb
-            case .memo: return AppColors.tabMemo
+            var icon: String {
+                switch self {
+                case .dictionary: return "text.book.closed"
+                case .file: return "doc"
+                case .web: return "globe"
+                case .memo: return "note.text"
+                }
+            }
+
+            var activeColor: Color {
+                switch self {
+                case .dictionary: return AppColors.tabDictionary
+                case .file: return AppColors.tabFile
+                case .web: return AppColors.tabWeb
+                case .memo: return AppColors.tabMemo
+                }
             }
         }
-    }
     @State private var selectedPanelTab: RightPanelTab = .dictionary
 
     @State private var previewFileURL: URL? = nil
@@ -151,24 +160,52 @@ struct ContentView: View {
     }
 
     private var rightPanel: some View {
-        VStack(spacing: 0) {
-            Spacer().frame(height: 24)
-            // 패널 탭 바 (파스텔 색깔)
-            HStack(spacing: 0) {
-                ForEach(RightPanelTab.allCases, id: \.self) { tab in
-                    Button {
-                        selectedPanelTab = tab
-                    } label: {
-                        Text(tab.rawValue)
-                            .font(.system(size: 11, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 7)
-                            .background(selectedPanelTab == tab ? tab.activeColor : Color.gray.opacity(0.08))
-                            .foregroundColor(selectedPanelTab == tab ? .black.opacity(0.8) : .primary.opacity(0.5))
-                    }
-                }
+            VStack(spacing: 0) {
+                Spacer().frame(height: 24)
+                panelTabBar
+                panelContent
             }
+        }
 
+    private var panelTabBar: some View {
+            HStack(spacing: 0) {
+                panelTabButton(tab: .dictionary)
+                panelTabButton(tab: .file)
+                panelTabButton(tab: .web)
+                panelTabButton(tab: .memo)
+                Spacer()
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
+            .background(Color.gray.opacity(0.04))
+        }
+
+        private func panelTabButton(tab: RightPanelTab) -> some View {
+            let isSelected = selectedPanelTab == tab
+            return Button {
+                selectedPanelTab = tab
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 11))
+                    Text(tab.rawValue)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(isSelected ? Color(.systemBackground) : Color.clear)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isSelected ? Color.gray.opacity(0.3) : Color.clear, lineWidth: 1)
+                )
+                .foregroundColor(isSelected ? .primary : .gray)
+            }
+            .buttonStyle(.plain)
+        }
+
+        @ViewBuilder
+        private var panelContent: some View {
             switch selectedPanelTab {
             case .dictionary: DictionaryView()
             case .file: FilePreviewPanel(fileURL: $previewFileURL, bookmarkData: $previewBookmarkData)
@@ -176,7 +213,6 @@ struct ContentView: View {
             case .memo: MemoPanel(text: $memoText)
             }
         }
-    }
 
     // MARK: - Booth 변경 알림
 
