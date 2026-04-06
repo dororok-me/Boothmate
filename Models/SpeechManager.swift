@@ -547,9 +547,9 @@ enum BoothMode: String, CaseIterable, Identifiable {
     }
     var defaultLanguage: String {
         switch self {
-        case .kr: return "ko-KR"
-        case .cn: return "ko-KR"
-        case .jp: return "ko-KR"
+        case .kr: return "en-US"
+        case .cn: return "zh-CN"
+        case .jp: return "ja-JP"
         }
     }
     func dictionaryType(for language: String) -> String {
