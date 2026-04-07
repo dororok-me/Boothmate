@@ -167,6 +167,7 @@ struct ContentView: View {
             panelTabButton(tab: .file)
             panelTabButton(tab: .web)
             panelTabButton(tab: .memo)
+            panelTabButton(tab: .gm)
             Spacer()
         }
         .padding(.horizontal, 6)
@@ -179,16 +180,16 @@ struct ContentView: View {
         return Button {
             selectedPanelTab = tab
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: tab.icon).font(.system(size: 11))
-                Text(tab.rawValue).font(.system(size: 11, weight: .semibold))
+            HStack(spacing: 2) {
+                Image(systemName: tab.icon).font(.system(size: 10))
+                Text(tab.rawValue).font(.system(size: 10, weight: .semibold))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 6)
             .background(isSelected ? Color(.systemBackground) : Color.clear)
-            .cornerRadius(8)
+            .cornerRadius(7)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 7)
                     .stroke(isSelected ? Color.gray.opacity(0.3) : Color.clear, lineWidth: 1)
             )
             .foregroundColor(isSelected ? .primary : .gray)

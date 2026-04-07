@@ -1,8 +1,9 @@
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
-class GMStore: ObservableObject {
+final class GMStore: ObservableObject {
 
     // MARK: - Data Structure
 
