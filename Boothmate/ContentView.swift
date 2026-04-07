@@ -17,12 +17,14 @@ struct AppColors {
     static let tabFile = Color(red: 0.95, green: 0.78, blue: 0.65)
     static let tabWeb = Color(red: 0.75, green: 0.85, blue: 0.72)
     static let tabMemo = Color(red: 0.88, green: 0.75, blue: 0.92)
+    static let tabGM = Color(red: 0.98, green: 0.85, blue: 0.55)
 }
 
 struct ContentView: View {
     @StateObject private var speechManager = SpeechManager()
     @StateObject private var glossaryStore = GlossaryStore()
     @StateObject private var currencyConverter = CurrencyConverter()
+    @StateObject private var gmStore = GMStore()
 
     @State private var showSettings = false
     @State private var showGlossary = false
@@ -36,6 +38,7 @@ struct ContentView: View {
         case file = "파일"
         case web = "웹"
         case memo = "메모"
+        case gm = "GM"
 
         var icon: String {
             switch self {
@@ -43,6 +46,7 @@ struct ContentView: View {
             case .file: return "doc"
             case .web: return "globe"
             case .memo: return "note.text"
+            case .gm: return "clock.arrow.circlepath"
             }
         }
 
@@ -52,6 +56,7 @@ struct ContentView: View {
             case .file: return AppColors.tabFile
             case .web: return AppColors.tabWeb
             case .memo: return AppColors.tabMemo
+            case .gm: return AppColors.tabGM
             }
         }
     }
@@ -198,6 +203,7 @@ struct ContentView: View {
         case .file: FilePreviewPanel(fileURL: $previewFileURL, bookmarkData: $previewBookmarkData)
         case .web: WebBrowserPanel()
         case .memo: MemoPanel(text: $memoText)
+        case .gm: GMView(gmStore: gmStore, glossaryStore: glossaryStore)
         }
     }
 
@@ -504,6 +510,8 @@ struct ContentView: View {
                     object: word,
                     userInfo: ["language": dicLanguage]
                 )
+                // GM에 검색 기록 저장
+                gmStore.add(word: word)
                 if !showRightPanel {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showRightPanel = true
