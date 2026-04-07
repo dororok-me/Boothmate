@@ -133,11 +133,7 @@ class SpeechManager: ObservableObject {
     weak var glossaryStore: GlossaryStore?
     var currencyConverter: CurrencyConverter?
     
-    // MARK: - Azure STT
-    @AppStorage("useAzure") var useAzure: Bool = false
-    @AppStorage("azureApiKey") var azureApiKey: String = ""
-    @AppStorage("azureRegion") var azureRegion: String = "koreacentral"
-    private let azureSpeechManager = AzureSpeechManager()
+    
     
     // MARK: - Private Properties
     
@@ -198,16 +194,16 @@ class SpeechManager: ObservableObject {
         return displayed
     }
     
-    // MARK: - 실시간 자막 업데이트 (throttle + 글로서리)
-    
+    // MARK: - 실시간 자막 업데이트 (throttle + 환산만 적용)
+    // 글로서리는 isFinal 확정 시에만 적용 (깜빡임 방지)
+
     private func updateCurrentText(_ rawText: String) {
         let now = Date()
         guard now.timeIntervalSince(lastUpdateTime) > 0.1 else { return }
         lastUpdateTime = now
-        
-        var displayed = applyGlossary(to: rawText)
-        displayed = applyConversions(to: displayed)
-        
+
+        let displayed = applyConversions(to: rawText)
+
         self.currentText = displayed
         if !self.isPaused {
             self.scrollTrigger += 1
@@ -234,61 +230,9 @@ class SpeechManager: ObservableObject {
         }
     }
     
-    // MARK: - Azure Recording
-    
-    func startAzureRecording() {
-        guard !azureApiKey.isEmpty else {
-            print("Azure API 키가 없습니다")
-            return
-        }
-        
-        stopRecording()
-        isRecording = true
-        elapsedSeconds = 0
-        
-        let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.elapsedSeconds += 1
-            }
-        }
-        RunLoop.main.add(newTimer, forMode: .common)
-        timer = newTimer
-        
-        azureSpeechManager.onRecognizing = { [weak self] text in
-            Task { @MainActor in
-                guard let self = self else { return }
-                self.updateCurrentText(text)
-            }
-        }
-        
-        azureSpeechManager.onRecognized = { [weak self] text in
-            Task { @MainActor in
-                guard let self = self else { return }
-                self.processFinalText(text)
-            }
-        }
-        
-        azureSpeechManager.onError = { [weak self] error in
-            Task { @MainActor in
-                print("❌ \(error)")
-                self?.stopRecording()
-            }
-        }
-        
-        azureSpeechManager.startRecording(
-            apiKey: azureApiKey,
-            region: azureRegion,
-            language: selectedLanguage
-        )
-    }
-    
     // MARK: - Start Recording (Apple Speech)
     
     func startRecording() {
-        if useAzure {
-            startAzureRecording()
-            return
-        }
         stopRecording()
         
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
@@ -463,7 +407,6 @@ class SpeechManager: ObservableObject {
     // MARK: - Stop Recording
     
     func stopRecording() {
-        azureSpeechManager.stopRecording()
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
@@ -497,10 +440,6 @@ class SpeechManager: ObservableObject {
         currentText = ""
     }
     
-    func exportAllSubtitles() -> String {
-        return allSubtitles.joined(separator: "\n")
-    }
-    
     // MARK: - Glossary
 
     private func applyGlossary(to text: String) -> String {
@@ -520,32 +459,50 @@ class SpeechManager: ObservableObject {
             guard !source.isEmpty, !target.isEmpty else { continue }
 
             // 이미 어노테이션된 경우 스킵
-            if output.contains("〔") && (
-                output.localizedCaseInsensitiveContains("\(source)(") ||
-                output.localizedCaseInsensitiveContains("\(target)(")
-            ) { continue }
-            if output.localizedCaseInsensitiveContains("\(source)(") ||
-               output.localizedCaseInsensitiveContains("\(target)(") { continue }
+            if output.localizedCaseInsensitiveContains("〔\(source)") ||
+               output.localizedCaseInsensitiveContains("〔\(target)") { continue }
 
-            // 〔〕마커로 감싸서 색칠 범위 명시
-            if output.localizedCaseInsensitiveContains(source) {
-                output = output.replacingOccurrences(of: source,
-                    with: "〔\(source)(\(target))〕", options: .caseInsensitive)
-            } else if output.localizedCaseInsensitiveContains(target) {
-                output = output.replacingOccurrences(of: target,
-                    with: "〔\(target)(\(source))〕", options: .caseInsensitive)
-            } else {
-                // 유의어 매칭
-                for synonym in entry.synonyms {
-                    let syn = synonym.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !syn.isEmpty else { continue }
-                    if output.localizedCaseInsensitiveContains("\(syn)(") { continue }
-                    if output.localizedCaseInsensitiveContains(syn) {
-                        output = output.replacingOccurrences(of: syn,
-                            with: "〔\(syn)(\(source))〕", options: .caseInsensitive)
-                        break
-                    }
+            // 띄어쓰기 제거 버전
+            let sourceNoSpace = source.replacingOccurrences(of: " ", with: "")
+            let targetNoSpace = target.replacingOccurrences(of: " ", with: "")
+
+            // 텍스트에서 띄어쓰기 제거한 버전으로 검색하는 헬퍼
+            // "인공지능" 발화 → source "인공 지능" 으로 등록된 것과 매칭
+            func findAndReplace(searchTerm: String, displayTerm: String, annotation: String) -> Bool {
+                let searchNoSpace = searchTerm.replacingOccurrences(of: " ", with: "")
+                // 이미 마커로 감싸진 경우 스킵
+                if output.localizedCaseInsensitiveContains("〔\(displayTerm)") { return false }
+                // 1. 원본 그대로 매칭
+                if output.localizedCaseInsensitiveContains(searchTerm) {
+                    output = output.replacingOccurrences(of: searchTerm,
+                        with: "〔\(displayTerm)(\(annotation))〕", options: .caseInsensitive)
+                    return true
                 }
+                // 2. 띄어쓰기 없는 버전 매칭 → 등록된 원문(displayTerm)으로 교체
+                if searchNoSpace != searchTerm && output.localizedCaseInsensitiveContains(searchNoSpace) {
+                    output = output.replacingOccurrences(of: searchNoSpace,
+                        with: "〔\(displayTerm)(\(annotation))〕", options: .caseInsensitive)
+                    return true
+                }
+                return false
+            }
+
+            // source 방향: 발화 → source(target)
+            if findAndReplace(searchTerm: source, displayTerm: source, annotation: target) { continue }
+            // target 방향: 발화 → target(source)
+            if findAndReplace(searchTerm: target, displayTerm: target, annotation: source) { continue }
+            // source 띄어쓰기 없는 버전: "인공지능" → "인공 지능(artificial intelligence)"
+            if sourceNoSpace != source &&
+               findAndReplace(searchTerm: sourceNoSpace, displayTerm: source, annotation: target) { continue }
+            // target 띄어쓰기 없는 버전
+            if targetNoSpace != target &&
+               findAndReplace(searchTerm: targetNoSpace, displayTerm: target, annotation: source) { continue }
+
+            // 유의어 매칭
+            for synonym in entry.synonyms {
+                let syn = synonym.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !syn.isEmpty else { continue }
+                if findAndReplace(searchTerm: syn, displayTerm: syn, annotation: source) { break }
             }
         }
 

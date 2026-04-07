@@ -124,12 +124,15 @@ struct ContentView: View {
         .onAppear {
             speechManager.glossaryStore = glossaryStore
             speechManager.currencyConverter = currencyConverter
+            sendBoothChangedNotification()
+            // 권한 요청과 환율 모두 백그라운드에서
             DispatchQueue.global(qos: .utility).async {
                 SFSpeechRecognizer.requestAuthorization { _ in }
                 AVAudioApplication.requestRecordPermission { _ in }
+                Task { @MainActor in
+                    currencyConverter.fetchRates()
+                }
             }
-            currencyConverter.fetchRates()
-            sendBoothChangedNotification()
         }
         .alert("언어 변경", isPresented: $showLanguageAlert) {
             Button("확인", role: .cancel) {}

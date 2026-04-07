@@ -106,13 +106,18 @@ struct TappableText: UIViewRepresentable {
             guard let parenOpenIndex = matchedStr.firstIndex(of: "(") else { continue }
             let prefix = String(matchedStr[matchedStr.startIndex..<parenOpenIndex])
 
-            // 환산 판별: 숫자 또는 통화기호가 앞에 있으면 환산
+            // 환산 판별: 괄호 앞 또는 괄호 안 내용으로 판별
             let hasDigit = prefix.unicodeScalars.contains(where: { CharacterSet.decimalDigits.contains($0) })
             let hasCurrency = prefix.unicodeScalars.contains(where: {
                 CharacterSet(charactersIn: "$₩¥€£").contains($0)
             })
+            let insideParen = String(matchedStr[parenOpenIndex...].dropFirst().prefix(while: { $0 != ")" }))
+            let insideHasCurrency = insideParen.unicodeScalars.contains(where: {
+                CharacterSet(charactersIn: "$₩¥€£").contains($0)
+            })
+            let insideFirstIsDigit = insideParen.first?.isNumber == true
 
-            if hasDigit || hasCurrency {
+            if hasDigit || hasCurrency || insideHasCurrency || insideFirstIsDigit {
                 // 환산: 괄호 안만 색칠
                 let parenOffset = matchedStr.distance(from: matchedStr.startIndex, to: parenOpenIndex)
                 let parenRange = NSRange(
