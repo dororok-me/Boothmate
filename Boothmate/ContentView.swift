@@ -9,19 +9,14 @@ import UniformTypeIdentifiers
 // MARK: - 색상 정의
 
 struct AppColors {
-    // 메뉴바 아이콘 통일 색상 (검은색 90%)
     static let menuIcon = Color.primary.opacity(0.9)
-
-    // Booth 색깔
     static let boothKR = Color.blue
     static let boothCN = Color.red
     static let boothJP = Color.black
-
-    // 우측 패널 탭 파스텔 색깔
-    static let tabDictionary = Color(red: 0.6, green: 0.82, blue: 0.88)  // 파스텔 하늘
-    static let tabFile = Color(red: 0.95, green: 0.78, blue: 0.65)       // 파스텔 살구
-    static let tabWeb = Color(red: 0.75, green: 0.85, blue: 0.72)        // 파스텔 민트
-    static let tabMemo = Color(red: 0.88, green: 0.75, blue: 0.92)       // 파스텔 라벤더
+    static let tabDictionary = Color(red: 0.6, green: 0.82, blue: 0.88)
+    static let tabFile = Color(red: 0.95, green: 0.78, blue: 0.65)
+    static let tabWeb = Color(red: 0.75, green: 0.85, blue: 0.72)
+    static let tabMemo = Color(red: 0.88, green: 0.75, blue: 0.92)
 }
 
 struct ContentView: View {
@@ -33,40 +28,39 @@ struct ContentView: View {
     @State private var showGlossary = false
     @State private var showLanguageAlert = false
     @State private var showBoothAlert = false
-
+    @State private var marqueeOffset: CGFloat = 0
     @State private var showRightPanel = true
 
     enum RightPanelTab: String, CaseIterable {
-            case dictionary = "사전"
-            case file = "파일"
-            case web = "웹"
-            case memo = "메모"
+        case dictionary = "사전"
+        case file = "파일"
+        case web = "웹"
+        case memo = "메모"
 
-            var icon: String {
-                switch self {
-                case .dictionary: return "text.book.closed"
-                case .file: return "doc"
-                case .web: return "globe"
-                case .memo: return "note.text"
-                }
-            }
-
-            var activeColor: Color {
-                switch self {
-                case .dictionary: return AppColors.tabDictionary
-                case .file: return AppColors.tabFile
-                case .web: return AppColors.tabWeb
-                case .memo: return AppColors.tabMemo
-                }
+        var icon: String {
+            switch self {
+            case .dictionary: return "text.book.closed"
+            case .file: return "doc"
+            case .web: return "globe"
+            case .memo: return "note.text"
             }
         }
-    @State private var selectedPanelTab: RightPanelTab = .dictionary
 
+        var activeColor: Color {
+            switch self {
+            case .dictionary: return AppColors.tabDictionary
+            case .file: return AppColors.tabFile
+            case .web: return AppColors.tabWeb
+            case .memo: return AppColors.tabMemo
+            }
+        }
+    }
+
+    @State private var selectedPanelTab: RightPanelTab = .dictionary
     @State private var previewFileURL: URL? = nil
     @State private var previewBookmarkData: Data? = nil
     @State private var memoText: String = ""
 
-    // 현재 Booth 색깔
     private var boothColor: Color {
         switch speechManager.selectedBooth {
         case .kr: return AppColors.boothKR
@@ -85,42 +79,32 @@ struct ContentView: View {
             let safeBottom = geo.safeAreaInsets.bottom
             let leftInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
             let menuBarHeight: CGFloat = 48
-
             let subtitleWidth = showRightPanel ? totalWidth * 0.65 : totalWidth
             let panelWidth = totalWidth * 0.35
 
             VStack(spacing: 0) {
-                // 상단 safe area
-                Color(.systemBackground)
-                    .frame(height: safeTop)
+                Color(.systemBackground).frame(height: safeTop)
 
-                // 콘텐츠
                 HStack(spacing: 0) {
                     subtitleArea(leftInset: leftInset)
                         .frame(width: subtitleWidth)
                         .background(speechManager.selectedTheme.backgroundColor)
 
                     if showRightPanel {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 1)
-
+                        Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 1)
                         rightPanel
-                            
                             .frame(width: panelWidth)
                             .background(Color(.systemBackground))
                     }
                 }
 
-                // 하단 메뉴바
                 Divider()
 
                 bottomMenuBar(leftInset: leftInset)
                     .frame(height: menuBarHeight)
                     .background(Color(.systemBackground))
 
-                Color(.systemBackground)
-                    .frame(height: safeBottom)
+                Color(.systemBackground).frame(height: safeBottom)
             }
             .frame(width: totalWidth, height: totalHeight)
         }
@@ -159,60 +143,60 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Right Panel
+
     private var rightPanel: some View {
-            VStack(spacing: 0) {
-                Spacer().frame(height: 24)
-                panelTabBar
-                panelContent
-            }
+        VStack(spacing: 0) {
+            Spacer().frame(height: 24)
+            panelTabBar
+            panelContent
         }
+    }
 
     private var panelTabBar: some View {
-            HStack(spacing: 0) {
-                panelTabButton(tab: .dictionary)
-                panelTabButton(tab: .file)
-                panelTabButton(tab: .web)
-                panelTabButton(tab: .memo)
-                Spacer()
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 5)
-            .background(Color.gray.opacity(0.04))
+        HStack(spacing: 0) {
+            panelTabButton(tab: .dictionary)
+            panelTabButton(tab: .file)
+            panelTabButton(tab: .web)
+            panelTabButton(tab: .memo)
+            Spacer()
         }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .background(Color.gray.opacity(0.04))
+    }
 
-        private func panelTabButton(tab: RightPanelTab) -> some View {
-            let isSelected = selectedPanelTab == tab
-            return Button {
-                selectedPanelTab = tab
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: tab.icon)
-                        .font(.system(size: 11))
-                    Text(tab.rawValue)
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(isSelected ? Color(.systemBackground) : Color.clear)
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? Color.gray.opacity(0.3) : Color.clear, lineWidth: 1)
-                )
-                .foregroundColor(isSelected ? .primary : .gray)
+    private func panelTabButton(tab: RightPanelTab) -> some View {
+        let isSelected = selectedPanelTab == tab
+        return Button {
+            selectedPanelTab = tab
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: tab.icon).font(.system(size: 11))
+                Text(tab.rawValue).font(.system(size: 11, weight: .semibold))
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(isSelected ? Color(.systemBackground) : Color.clear)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.gray.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+            .foregroundColor(isSelected ? .primary : .gray)
         }
+        .buttonStyle(.plain)
+    }
 
-        @ViewBuilder
-        private var panelContent: some View {
-            switch selectedPanelTab {
-            case .dictionary: DictionaryView()
-            case .file: FilePreviewPanel(fileURL: $previewFileURL, bookmarkData: $previewBookmarkData)
-            case .web: WebBrowserPanel()
-            case .memo: MemoPanel(text: $memoText)
-            }
+    @ViewBuilder
+    private var panelContent: some View {
+        switch selectedPanelTab {
+        case .dictionary: DictionaryView()
+        case .file: FilePreviewPanel(fileURL: $previewFileURL, bookmarkData: $previewBookmarkData)
+        case .web: WebBrowserPanel()
+        case .memo: MemoPanel(text: $memoText)
         }
+    }
 
     // MARK: - Booth 변경 알림
 
@@ -277,7 +261,6 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
 
-            // 패널 토글 (동일 색상)
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     showRightPanel.toggle()
@@ -285,15 +268,29 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "sidebar.trailing")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(showRightPanel ? AppColors.menuIcon : AppColors.menuIcon)
+                    .foregroundColor(AppColors.menuIcon)
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
 
             Spacer()
+
+            if speechManager.isRecording {
+                timerView
+            }
         }
         .padding(.leading, 12 + leftInset)
         .padding(.trailing, 12)
+    }
+
+    private var timerView: some View {
+        Text(String(format: "%02d:%02d:%02d",
+             speechManager.elapsedSeconds / 3600,
+             (speechManager.elapsedSeconds % 3600) / 60,
+             speechManager.elapsedSeconds % 60))
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .foregroundColor(.gray)
+            .padding(.trailing, 4)
     }
 
     // MARK: - Booth Toggle
@@ -347,33 +344,107 @@ struct ContentView: View {
 
     // MARK: - Record Button
 
-    private var recordButton: some View {
-        Button {
-            speechManager.isRecording ? speechManager.stopRecording() : speechManager.startRecording()
-        } label: {
-            ZStack {
-                Circle()
-                    .fill(speechManager.isRecording ? Color.red : Color.green)
-                    .frame(width: 36, height: 36)
+    // MARK: - Record Button
 
-                if speechManager.isRecording {
-                    VStack(spacing: 0) {
-                        Text(String(format: "%02d:", speechManager.elapsedSeconds / 60))
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
-                        Text(String(format: "%02d", speechManager.elapsedSeconds % 60))
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
+        private var recordButton: some View {
+            HStack(spacing: 6) {
+                // Start / Stop 버튼 (원형)
+                Button {
+                    if speechManager.isRecording {
+                        speechManager.stopRecording()
+                        marqueeOffset = 0
+                    } else {
+                        speechManager.startRecording()
+                        startMarquee()
                     }
-                } else {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
+                } label: {
+                    if speechManager.isRecording {
+                        transcribingView
+                    } else {
+                        startButtonView
+                    }
                 }
+                .buttonStyle(.plain)
+
+                // Pause 버튼 (항상 보임)
+                pauseResumeButton
             }
         }
-        .buttonStyle(.plain)
-    }
+
+        private var pauseResumeButton: some View {
+            Button {
+                if speechManager.isRecording {
+                    if speechManager.isPaused {
+                        speechManager.resumeRecording()
+                    } else {
+                        speechManager.pauseRecording()
+                    }
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(speechManager.isPaused ? Color(red: 0.9, green: 0.2, blue: 0.5) : Color.gray.opacity(0.25))
+                        .frame(width: 36, height: 36)
+
+                    if speechManager.isPaused {
+                        Text("||")
+                            .font(.system(size: 11, weight: .black, design: .monospaced))
+                            .foregroundColor(.white)
+                    } else {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.gray.opacity(0.5))
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .opacity(speechManager.isRecording ? 1.0 : 0.3)
+            .disabled(!speechManager.isRecording)
+        }
+
+        private var transcribingView: some View {
+            ZStack {
+                Circle()
+                    .fill(Color.red.opacity(0.85))
+                    .frame(width: 36, height: 36)
+
+                // 두 개의 텍스트로 자연스럽게 연속 흐르기
+                ZStack {
+                    Text("Transcribing")
+                        .font(.system(size: 7, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .fixedSize()
+                        .offset(x: marqueeOffset)
+
+                    Text("Transcribing")
+                        .font(.system(size: 7, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .fixedSize()
+                        .offset(x: marqueeOffset + 100)
+                }
+            }
+            .frame(width: 36, height: 36)
+            .clipShape(Circle())
+        }
+
+        private var startButtonView: some View {
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.25, green: 0.78, blue: 0.65))
+                    .frame(width: 36, height: 36)
+
+                Image(systemName: "play.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+            }
+        }
+
+        private func startMarquee() {
+            marqueeOffset = 30
+            withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+                marqueeOffset = -70
+            }
+        }
 
     // MARK: - Subtitle Area
 
@@ -402,11 +473,7 @@ struct ContentView: View {
                 }
             }
 
-            if speechManager.useAzure && speechManager.isRecording {
-                AzureBadge()
-                    .padding(.trailing, 12)
-                    .padding(.top, 12)
-            }
+
         }
     }
 
@@ -459,22 +526,15 @@ struct ContentView: View {
 
 struct MemoPanel: View {
     @Binding var text: String
-
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("메모")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.gray)
+                Text("메모").font(.system(size: 12, weight: .semibold)).foregroundColor(.gray)
                 Spacer()
-                Text("\(text.count)자")
-                    .font(.system(size: 10))
-                    .foregroundColor(.gray.opacity(0.6))
+                Text("\(text.count)자").font(.system(size: 10)).foregroundColor(.gray.opacity(0.6))
                 if !text.isEmpty {
                     Button { text = "" } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 12))
-                            .foregroundColor(.gray)
+                        Image(systemName: "trash").font(.system(size: 12)).foregroundColor(.gray)
                     }
                     .buttonStyle(.plain)
                 }
@@ -503,52 +563,8 @@ struct FilePreviewPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                if let url = fileURL {
-                    Image(systemName: iconForFile(url))
-                        .font(.system(size: 12))
-                        .foregroundColor(.blue)
-                    Text(url.lastPathComponent)
-                        .font(.system(size: 11))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                Spacer()
-                Button { showFilePicker = true } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "folder")
-                            .font(.system(size: 12))
-                        Text("파일 열기")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(Color.gray.opacity(0.08))
-
-            if let url = resolveFileURL() {
-                QuickLookPreview(url: url).id(previewID)
-            } else {
-                VStack {
-                    Spacer()
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 32))
-                        .foregroundColor(.gray.opacity(0.4))
-                        .padding(.bottom, 8)
-                    Text("파일을 선택하세요")
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                    Spacer()
-                }
-            }
+            fileHeader
+            fileContent
         }
         .sheet(isPresented: $showFilePicker) {
             DocumentPicker { url in
@@ -558,6 +574,45 @@ struct FilePreviewPanel: View {
                 ) { bookmarkData = bookmark }
                 fileURL = url
                 previewID = UUID()
+            }
+        }
+    }
+
+    private var fileHeader: some View {
+        HStack {
+            if let url = fileURL {
+                Image(systemName: iconForFile(url)).font(.system(size: 12)).foregroundColor(.blue)
+                Text(url.lastPathComponent).font(.system(size: 11)).foregroundColor(.primary).lineLimit(1).truncationMode(.middle)
+            }
+            Spacer()
+            Button { showFilePicker = true } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "folder").font(.system(size: 12))
+                    Text("파일 열기").font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.blue)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.gray.opacity(0.08))
+    }
+
+    @ViewBuilder
+    private var fileContent: some View {
+        if let url = resolveFileURL() {
+            QuickLookPreview(url: url).id(previewID)
+        } else {
+            VStack {
+                Spacer()
+                Image(systemName: "doc.text").font(.system(size: 32)).foregroundColor(.gray.opacity(0.4)).padding(.bottom, 8)
+                Text("파일을 선택하세요").font(.system(size: 14)).foregroundColor(.gray)
+                Spacer()
             }
         }
     }
@@ -638,35 +693,78 @@ struct WebBrowserPanel: View {
     @State private var urlText: String = ""
     @State private var currentURL: URL? = nil
 
+    private let quickLinks: [(String, String, String)] = [
+        ("🔍", "Google", "https://www.google.com"),
+        ("📗", "N사전", "https://m.dict.naver.com"),
+        ("🌐", "G번역", "https://translate.google.com"),
+        ("📺", "YouTube", "https://m.youtube.com"),
+        ("📰", "Naver", "https://m.naver.com"),
+    ]
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                TextField("URL 입력", text: $urlText)
-                    .font(.system(size: 12))
-                    .textFieldStyle(.roundedBorder)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-                    .onSubmit { loadURL() }
-                Button { loadURL() } label: {
-                    Image(systemName: "arrow.right.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            urlInputBar
+            quickLinkBar
 
             if let url = currentURL {
                 WebBrowserWebView(url: url)
             } else {
-                VStack {
-                    Spacer()
-                    Image(systemName: "globe").font(.system(size: 32)).foregroundColor(.gray.opacity(0.4)).padding(.bottom, 8)
-                    Text("URL을 입력하세요").font(.system(size: 14)).foregroundColor(.gray)
-                    Spacer()
+                emptyWebView
+            }
+        }
+    }
+
+    private var urlInputBar: some View {
+        HStack(spacing: 6) {
+            TextField("URL 입력", text: $urlText)
+                .font(.system(size: 12))
+                .textFieldStyle(.roundedBorder)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
+                .onSubmit { loadURL() }
+            Button { loadURL() } label: {
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.blue)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+    }
+
+    private var quickLinkBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(quickLinks, id: \.1) { emoji, title, url in
+                    Button {
+                        urlText = url
+                        currentURL = URL(string: url)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(emoji).font(.system(size: 11))
+                            Text(title).font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundColor(.primary.opacity(0.7))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color(.systemGray6))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 6)
+        }
+    }
+
+    private var emptyWebView: some View {
+        VStack {
+            Spacer()
+            Image(systemName: "globe").font(.system(size: 32)).foregroundColor(.gray.opacity(0.4)).padding(.bottom, 8)
+            Text("URL을 입력하세요").font(.system(size: 14)).foregroundColor(.gray)
+            Spacer()
         }
     }
 
@@ -689,22 +787,4 @@ struct WebBrowserWebView: UIViewRepresentable {
     }
 }
 
-// MARK: - Azure Badge
 
-struct AzureBadge: View {
-    @State private var glowing = false
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "cloud.fill").font(.system(size: 10))
-            Text("Azure").font(.system(size: 9, weight: .semibold))
-        }
-        .foregroundColor(.blue)
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(Color.blue.opacity(0.1))
-        .clipShape(Capsule())
-        .opacity(glowing ? 1.0 : 0.4)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) { glowing = true }
-        }
-    }
-}
