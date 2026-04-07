@@ -176,7 +176,7 @@ struct DaumDictionaryWebView: UIViewRepresentable {
         document.head.appendChild(meta);
 
         var style = document.createElement('style');
-        style.textContent = '* { max-width: 100vw !important; } body, html { overflow-x: hidden !important; } .card_word > .search_box, .card_word > .wrap_searchbar, .card_word > form, .search_suggest, .list_suggest, .wrap_suggest, .clean_search_input, .inner_searchbar, .tog_cleansch, .autocomplete_wrap, .direct_area, #searchBar, .card_word .search_area, .clean_search_wrap, .search_cleansch, .wrap_searchbar, .search_top, .box_searchbar, .wrap_select, .select_dic, .search_word, .txt_info, #suggestionWrap, .search_input, .wrap_search, .search_area, .area_search, .inner_search, #header, .gnb_comm, .header_search, .wrap_topsearch, .cleansch_border, .wrap_toolbar, .toolbar_dic { display: none !important; height: 0 !important; padding: 0 !important; margin: 0 !important; overflow: hidden !important; }';
+        style.textContent = '::-webkit-scrollbar { display: none !important; width: 0 !important; } * { max-width: 100vw !important; } body, html { overflow-x: hidden !important; } .card_word > .search_box, .card_word > .wrap_searchbar, .card_word > form, .search_suggest, .list_suggest, .wrap_suggest, .clean_search_input, .inner_searchbar, .tog_cleansch, .autocomplete_wrap, .direct_area, #searchBar, .card_word .search_area, .clean_search_wrap, .search_cleansch, .wrap_searchbar, .search_top, .box_searchbar, .wrap_select, .select_dic, .search_word, .txt_info, #suggestionWrap, .search_input, .wrap_search, .search_area, .area_search, .inner_search, #header, .gnb_comm, .header_search, .wrap_topsearch, .cleansch_border, .wrap_toolbar, .toolbar_dic { display: none !important; height: 0 !important; padding: 0 !important; margin: 0 !important; overflow: hidden !important; }';
         document.head.appendChild(style);
 
         document.body.style.webkitTextSizeAdjust = '70%';
@@ -201,6 +201,8 @@ struct DaumDictionaryWebView: UIViewRepresentable {
         webView.scrollView.minimumZoomScale = 0.3
         webView.scrollView.maximumZoomScale = 3.0
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.showsVerticalScrollIndicator = false
+        webView.scrollView.showsHorizontalScrollIndicator = false
         webView.load(URLRequest(url: url))
         return webView
     }

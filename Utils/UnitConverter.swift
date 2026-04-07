@@ -75,7 +75,7 @@ struct UnitConverter {
                 let inches = cm / 2.54
                 return formatNumber(inches) + "inch"
             }
-            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*m(?!²|㎡|illion|illio)"#, unit: "m_rev") { m in
+            output = convert(in: output, pattern: #"(\d+(?:,\d+)*(?:\.\d+)?)\s*m(?!²|㎡|[a-zA-Z])"#, unit: "m_rev") { m in
                     let feet = m / 0.3048
                     return formatNumber(feet) + "ft"
             }

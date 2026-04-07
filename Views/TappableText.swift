@@ -38,11 +38,10 @@ struct TappableText: UIViewRepresentable {
     // MARK: - Attributed String
     //
     // 괄호 색깔 규칙:
-    // 1. 환산: 숫자+단위(변환) → 괄호 안만 glossaryColor, 앞 단위는 기본색
-    //    - "7 feet(2.1m)" → feet 기본색, (2.1m) glossaryColor
-    //    - "$20,000(₩약 3,021만원)" → $20,000 기본색, (₩약...) glossaryColor
-    //    - "10,000,000 km(6,213,727miles)" → km 기본색, (...) glossaryColor
-    // 2. 글로서리: 단어(번역) → 전체 glossaryColor
+    // 1. 글로서리: SpeechManager가 〔...〕마커로 감싸줌 → 마커 안 전체 glossaryColor, 마커는 숨김
+    //    - "〔artificial intelligence(인공 지능)〕" → 전체 주황색, 〔〕는 안 보임
+    // 2. 환산: 숫자+단위(변환) → 괄호 안만 glossaryColor
+    //    - "7 feet(2.1m)" → feet 기본색, (2.1m) 주황색
 
     private func buildAttributedString() -> NSAttributedString {
         let paragraphStyle = NSMutableParagraphStyle()
@@ -54,64 +53,75 @@ struct TappableText: UIViewRepresentable {
             .paragraphStyle: paragraphStyle
         ]
 
-        let result = NSMutableAttributedString(string: text, attributes: baseAttrs)
-        let nsText = text as NSString
-
-        guard glossaryEnabled else { return result }
-
         let glossaryAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: .medium),
             .foregroundColor: UIColor(glossaryColor),
             .paragraphStyle: paragraphStyle
         ]
 
-        // 환산 패턴: 괄호 앞에 숫자가 있는 경우 (공백 허용)
-        // 예: "$20,000(₩약...)", "7 feet(2.1m)", "10,000,000 km(6,213,727miles)"
-        // 매칭: [숫자/통화/콤마/소수점][공백?][단위?](괄호내용)
-        guard let conversionRegex = try? NSRegularExpression(
-            pattern: "(?:[\\d,.]+[\\s]?[A-Za-z°]*|[$₩¥€£][\\d,.]+)\\([^)]+\\)",
-            options: []
-        ) else { return result }
+        // 마커 숨김용 (폰트 크기 0, 투명)
+        let hiddenAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 0.001),
+            .foregroundColor: UIColor.clear,
+            .paragraphStyle: paragraphStyle
+        ]
 
-        // 글로서리 패턴: 비숫자 단어(괄호내용)
-        guard let allParenRegex = try? NSRegularExpression(
+        guard glossaryEnabled else {
+            // 글로서리 비활성화 시에도 마커는 제거
+            let cleaned = text.replacingOccurrences(of: "〔", with: "").replacingOccurrences(of: "〕", with: "")
+            return NSAttributedString(string: cleaned, attributes: baseAttrs)
+        }
+
+        let result = NSMutableAttributedString(string: text, attributes: baseAttrs)
+        let nsText = text as NSString
+
+        // 1단계: 〔〕마커 처리 (글로서리 - 전체 색칠, 마커 숨김)
+        if let markerRegex = try? NSRegularExpression(pattern: "〔([^〕]+)〕", options: []) {
+            let matches = markerRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+            for match in matches.reversed() {
+                // 전체 범위 glossaryColor
+                result.addAttributes(glossaryAttrs, range: match.range)
+                // 〔 숨기기 (첫 글자)
+                result.addAttributes(hiddenAttrs, range: NSRange(location: match.range.location, length: 1))
+                // 〕 숨기기 (마지막 글자)
+                result.addAttributes(hiddenAttrs, range: NSRange(location: match.range.location + match.range.length - 1, length: 1))
+            }
+        }
+
+        // 2단계: 환산 패턴 처리 (괄호 안만 색칠)
+        // 마커 없는 것 중에서 숫자/통화 앞에 있는 괄호만
+        guard let conversionRegex = try? NSRegularExpression(
             pattern: "\\S+\\([^)]+\\)",
             options: []
         ) else { return result }
 
-        // 1단계: 환산 괄호 처리 (괄호 안만 색칠)
-        let conversionMatches = conversionRegex.matches(
-            in: text, range: NSRange(location: 0, length: nsText.length)
-        )
-        var conversionRanges = Set<Int>() // 환산으로 처리된 위치 기록
+        let matches = conversionRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
 
-        for match in conversionMatches {
+        for match in matches {
             let matchedStr = nsText.substring(with: match.range)
-            if let parenStart = matchedStr.firstIndex(of: "(") {
-                let parenOffset = matchedStr.distance(from: matchedStr.startIndex, to: parenStart)
+
+            // 마커 안에 있는 것은 이미 처리됨 → 스킵
+            if matchedStr.contains("〔") || matchedStr.contains("〕") { continue }
+
+            guard let parenOpenIndex = matchedStr.firstIndex(of: "(") else { continue }
+            let prefix = String(matchedStr[matchedStr.startIndex..<parenOpenIndex])
+
+            // 환산 판별: 숫자 또는 통화기호가 앞에 있으면 환산
+            let hasDigit = prefix.unicodeScalars.contains(where: { CharacterSet.decimalDigits.contains($0) })
+            let hasCurrency = prefix.unicodeScalars.contains(where: {
+                CharacterSet(charactersIn: "$₩¥€£").contains($0)
+            })
+
+            if hasDigit || hasCurrency {
+                // 환산: 괄호 안만 색칠
+                let parenOffset = matchedStr.distance(from: matchedStr.startIndex, to: parenOpenIndex)
                 let parenRange = NSRange(
                     location: match.range.location + parenOffset,
                     length: match.range.length - parenOffset
                 )
                 result.addAttributes(glossaryAttrs, range: parenRange)
-
-                // 이 범위는 환산으로 처리됨
-                for i in match.range.location..<(match.range.location + match.range.length) {
-                    conversionRanges.insert(i)
-                }
             }
-        }
-
-        // 2단계: 글로서리 괄호 처리 (환산이 아닌 것만 전체 색칠)
-        let allMatches = allParenRegex.matches(
-            in: text, range: NSRange(location: 0, length: nsText.length)
-        )
-
-        for match in allMatches {
-            // 이미 환산으로 처리된 범위면 스킵
-            if conversionRanges.contains(match.range.location) { continue }
-
-            result.addAttributes(glossaryAttrs, range: match.range)
+            // 환산 아닌 것(마커 없는 글로서리)은 색칠 안 함 - SpeechManager가 마커 안 붙인 건 매칭 안 된 것
         }
 
         return result
@@ -171,6 +181,8 @@ struct TappableText: UIViewRepresentable {
 
             let word = nsText.substring(with: NSRange(location: wordStart, length: wordEnd - wordStart))
             let cleaned = word
+                .replacingOccurrences(of: "〔", with: "")
+                .replacingOccurrences(of: "〕", with: "")
                 .replacingOccurrences(of: "\\([^)]*\\)", with: "", options: .regularExpression)
                 .trimmingCharacters(in: .punctuationCharacters)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
