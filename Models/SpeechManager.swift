@@ -256,7 +256,7 @@ class SpeechManager: ObservableObject {
         // 2. 마이크 권한 확인 후 녹음 시작
         requestMicAndBegin()
     }
-    
+
     private func requestMicAndBegin() {
         AVAudioApplication.requestRecordPermission { [weak self] granted in
             guard granted else {
@@ -269,40 +269,48 @@ class SpeechManager: ObservableObject {
             }
         }
     }
-    
+
     private func beginRecording() {
+        // 엔진 완전 초기화 (중복 탭 설치 방지)
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine.reset()
+
         stopRecording()
-        
+
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
             print("현재 선택된 언어의 음성 인식을 사용할 수 없습니다.")
+            isRecording = false
             return
         }
-        
+
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.record, mode: .measurement, options: [.duckOthers, .allowBluetooth])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            
+
             if let preferredInput = audioSession.availableInputs?.first(where: { $0.portType == .usbAudio }) {
                 try audioSession.setPreferredInput(preferredInput)
             }
-            
+
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             guard let recognitionRequest = recognitionRequest else { return }
             recognitionRequest.shouldReportPartialResults = true
-            
+
             let inputNode = audioEngine.inputNode
             let format = inputNode.outputFormat(forBus: 0)
             inputNode.removeTap(onBus: 0)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
-            
+
             audioEngine.prepare()
             try audioEngine.start()
             isRecording = true
-            
+
             elapsedSeconds = 0
             sessionSeconds = 0
             let newTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
@@ -318,7 +326,7 @@ class SpeechManager: ObservableObject {
             }
             RunLoop.main.add(newTimer, forMode: .common)
             timer = newTimer
-            
+
             recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 Task { @MainActor in
                     guard let self = self else { return }
@@ -339,6 +347,7 @@ class SpeechManager: ObservableObject {
             }
         } catch {
             print("녹음 시작 오류: \(error.localizedDescription)")
+            isRecording = false
         }
     }
     
