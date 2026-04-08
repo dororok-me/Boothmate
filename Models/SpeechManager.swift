@@ -202,8 +202,10 @@ class SpeechManager: ObservableObject {
         guard now.timeIntervalSince(lastUpdateTime) > 0.1 else { return }
         lastUpdateTime = now
 
-        let displayed = applyConversions(to: rawText)
+        var displayed = applyGlossary(to: rawText)
+        displayed = applyConversions(to: displayed)
 
+        guard displayed != self.currentText else { return }
         self.currentText = displayed
         if !self.isPaused {
             self.scrollTrigger += 1
@@ -233,6 +235,42 @@ class SpeechManager: ObservableObject {
     // MARK: - Start Recording (Apple Speech)
     
     func startRecording() {
+        // UI 즉시 반응
+        isRecording = true
+
+        // 1. 음성 인식 권한 확인
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
+            print("음성 인식 권한 없음 — 권한 요청 중")
+            SFSpeechRecognizer.requestAuthorization { [weak self] status in
+                guard status == .authorized else {
+                    print("음성 인식 권한 거부됨")
+                    Task { @MainActor in self?.isRecording = false }
+                    return
+                }
+                Task { @MainActor in
+                    self?.requestMicAndBegin()
+                }
+            }
+            return
+        }
+        // 2. 마이크 권한 확인 후 녹음 시작
+        requestMicAndBegin()
+    }
+    
+    private func requestMicAndBegin() {
+        AVAudioApplication.requestRecordPermission { [weak self] granted in
+            guard granted else {
+                print("마이크 권한 거부됨")
+                Task { @MainActor in self?.isRecording = false }
+                return
+            }
+            Task { @MainActor in
+                self?.beginRecording()
+            }
+        }
+    }
+    
+    private func beginRecording() {
         stopRecording()
         
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
