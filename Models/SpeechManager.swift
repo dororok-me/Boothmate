@@ -126,6 +126,14 @@ class SpeechManager: ObservableObject {
     @Published var selectedBooth: BoothMode = .kr
     
     @Published var scrollTrigger: Int = 0
+
+    // Font Weight
+    @AppStorage("fontBold") var fontBold: Bool = false
+
+    // Azure STT
+    @AppStorage("useAzure") var useAzure: Bool = false
+    @AppStorage("azureApiKey") var azureApiKey: String = ""
+    @AppStorage("azureRegion") var azureRegion: String = "koreacentral"
     
     // MARK: - Storage
     
@@ -481,6 +489,10 @@ class SpeechManager: ObservableObject {
     
     // MARK: - Subtitles Management
     
+    func exportAllSubtitles() -> String {
+        return allSubtitles.joined(separator: "\n")
+    }
+
     func clearSubtitles() {
         subtitles.removeAll()
         allSubtitles.removeAll()

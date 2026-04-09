@@ -36,17 +36,30 @@ struct SettingsView: View {
     }
 
     private var languageSection: some View {
-        Section("Language") {
-            Picker("Recognition Language", selection: $speechManager.selectedLanguage) {
-                ForEach(speechManager.languages, id: \.1) { item in
-                    Text(item.0).tag(item.1)
+        Section("Booth & Language") {
+            Picker("Booth", selection: $speechManager.selectedBooth) {
+                ForEach(BoothMode.allCases) { booth in
+                    Text(booth.rawValue).tag(booth)
                 }
             }
-            .pickerStyle(.inline)
+            .pickerStyle(.segmented)
+            .onChange(of: speechManager.selectedBooth) { _, newBooth in
+                speechManager.selectedLanguage = newBooth.defaultLanguage
+                let boothLanguage: String
+                switch newBooth {
+                case .kr: boothLanguage = "en-US"
+                case .cn: boothLanguage = "zh-CN"
+                case .jp: boothLanguage = "ja-JP"
+                }
+                NotificationCenter.default.post(name: .boothChanged, object: boothLanguage)
+            }
 
-            Text("Current: \(displayLanguageName(for: speechManager.selectedLanguage))")
-                .font(.footnote)
-                .foregroundColor(.secondary)
+            HStack {
+                Text("Recognition Language")
+                Spacer()
+                Text(displayLanguageName(for: speechManager.selectedBooth.defaultLanguage))
+                    .foregroundColor(.secondary)
+            }
         }
     }
 
@@ -70,8 +83,20 @@ struct SettingsView: View {
 
             Slider(value: $speechManager.lineSpacing, in: 0...30, step: 2)
 
+            HStack {
+                Text("Font Weight")
+                Spacer()
+                Picker("", selection: $speechManager.fontBold) {
+                    Text("Normal").tag(false)
+                    Text("Bold").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 160)
+            }
+
             Text("Preview Text\nSecond line here")
-                .font(.system(size: speechManager.fontSize))
+                .font(.system(size: speechManager.fontSize,
+                              weight: speechManager.fontBold ? .bold : .regular))
                 .lineSpacing(speechManager.lineSpacing)
                 .padding(.vertical, 6)
         }

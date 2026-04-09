@@ -144,6 +144,23 @@ struct ContentView: View {
         } message: {
             Text("녹음을 정지한 후 언어를 변경해 주세요")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .dicTabChanged)) { notification in
+            guard let boothLanguage = notification.object as? String else { return }
+            switch boothLanguage {
+            case "ja-JP":
+                speechManager.selectedBooth = .jp
+                speechManager.selectedLanguage = "ja-JP"
+                NotificationCenter.default.post(name: .boothChanged, object: "ja-JP")
+            case "zh-CN":
+                speechManager.selectedBooth = .cn
+                speechManager.selectedLanguage = "zh-CN"
+                NotificationCenter.default.post(name: .boothChanged, object: "zh-CN")
+            default:
+                speechManager.selectedBooth = .kr
+                speechManager.selectedLanguage = "en-US"
+                NotificationCenter.default.post(name: .boothChanged, object: "en-US")
+            }
+        }
         .alert("Booth 변경", isPresented: $showBoothAlert) {
             Button("확인", role: .cancel) {}
         } message: {
@@ -234,7 +251,6 @@ struct ContentView: View {
             }
 
             recordButton
-            boothToggle
             languageToggle
 
             Button { speechManager.clearSubtitles() } label: {
@@ -499,6 +515,7 @@ struct ContentView: View {
                 : speechManager.selectedTheme.textColor,
             lineSpacing: speechManager.lineSpacing,
             glossaryEnabled: speechManager.glossaryEnabled,
+            fontBold: speechManager.fontBold,
             onTapWord: { word in
                 let dicLanguage: String
                 switch speechManager.selectedBooth {

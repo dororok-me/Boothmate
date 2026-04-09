@@ -8,6 +8,7 @@ struct TappableText: UIViewRepresentable {
     let glossaryColor: Color
     let lineSpacing: CGFloat
     let glossaryEnabled: Bool
+    let fontBold: Bool
     let onTapWord: (String) -> Void
 
     // MARK: - UIViewRepresentable
@@ -28,7 +29,9 @@ struct TappableText: UIViewRepresentable {
     }
 
     func updateUIView(_ label: UILabel, context: Context) {
-        label.attributedText = buildAttributedString()
+        if !context.coordinator.isHighlighting {
+            label.attributedText = buildAttributedString()
+        }
         if label.bounds.width > 0 {
             label.preferredMaxLayoutWidth = label.bounds.width
         }
@@ -47,14 +50,15 @@ struct TappableText: UIViewRepresentable {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineSpacing = lineSpacing
 
+        let weight: UIFont.Weight = fontBold ? .bold : .regular
         let baseAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: fontSize, weight: .medium),
+            .font: UIFont.systemFont(ofSize: fontSize, weight: weight),
             .foregroundColor: UIColor(textColor),
             .paragraphStyle: paragraphStyle
         ]
 
         let glossaryAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: fontSize, weight: .medium),
+            .font: UIFont.systemFont(ofSize: fontSize, weight: weight),
             .foregroundColor: UIColor(glossaryColor),
             .paragraphStyle: paragraphStyle
         ]
@@ -140,6 +144,7 @@ struct TappableText: UIViewRepresentable {
 
     class Coordinator: NSObject {
         var onTapWord: (String) -> Void
+        var isHighlighting: Bool = false
 
         init(onTapWord: @escaping (String) -> Void) {
             self.onTapWord = onTapWord
@@ -197,12 +202,14 @@ struct TappableText: UIViewRepresentable {
                 let highlighted = NSMutableAttributedString(attributedString: attributedText)
                 highlighted.addAttribute(
                     .backgroundColor,
-                    value: UIColor.systemYellow.withAlphaComponent(0.4),
+                    value: UIColor.systemYellow.withAlphaComponent(0.5),
                     range: highlightRange
                 )
+                self.isHighlighting = true
                 label.attributedText = highlighted
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.isHighlighting = false
                     label.attributedText = attributedText
                 }
 
