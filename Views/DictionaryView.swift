@@ -39,6 +39,13 @@ struct DictionaryView: View {
                         if !currentWord.isEmpty {
                             currentURL = makeSearchURL(for: currentWord, dicType: tab.dicCode)
                         }
+                        let boothLanguage: String
+                        switch tab {
+                        case .eng: boothLanguage = "en-US"
+                        case .jp:  boothLanguage = "ja-JP"
+                        case .ch:  boothLanguage = "zh-CN"
+                        }
+                        NotificationCenter.default.post(name: .dicTabChanged, object: boothLanguage)
                     } label: {
                         Text(tab.rawValue)
                             .font(.system(size: 11, weight: .semibold))

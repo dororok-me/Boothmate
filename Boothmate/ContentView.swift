@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import UIKit
 import Speech
 import AVFoundation
@@ -32,6 +33,7 @@ struct ContentView: View {
     @State private var showBoothAlert = false
     @State private var marqueeOffset: CGFloat = 0
     @State private var showRightPanel = true
+    @State private var boothRefresh = false
 
     enum RightPanelTab: String, CaseIterable {
         case dictionary = "사전"
@@ -108,6 +110,7 @@ struct ContentView: View {
                 bottomMenuBar(leftInset: leftInset)
                     .frame(height: menuBarHeight)
                     .background(Color(.systemBackground))
+                    .id(boothRefresh)
 
                 Color(.systemBackground).frame(height: safeBottom)
             }
@@ -149,16 +152,19 @@ struct ContentView: View {
             switch boothLanguage {
             case "ja-JP":
                 speechManager.selectedBooth = .jp
-                speechManager.selectedLanguage = "ja-JP"
-                NotificationCenter.default.post(name: .boothChanged, object: "ja-JP")
+                speechManager.selectedLanguage = BoothMode.jp.defaultLanguage
+                speechManager.objectWillChange.send()
+                sendBoothChangedNotification()
             case "zh-CN":
                 speechManager.selectedBooth = .cn
-                speechManager.selectedLanguage = "zh-CN"
-                NotificationCenter.default.post(name: .boothChanged, object: "zh-CN")
+                speechManager.selectedLanguage = BoothMode.cn.defaultLanguage
+                speechManager.objectWillChange.send()
+                sendBoothChangedNotification()
             default:
                 speechManager.selectedBooth = .kr
-                speechManager.selectedLanguage = "en-US"
-                NotificationCenter.default.post(name: .boothChanged, object: "en-US")
+                speechManager.selectedLanguage = BoothMode.kr.defaultLanguage
+                speechManager.objectWillChange.send()
+                sendBoothChangedNotification()
             }
         }
         .alert("Booth 변경", isPresented: $showBoothAlert) {
@@ -259,25 +265,26 @@ struct ContentView: View {
                     .foregroundColor(AppColors.menuIcon)
                     .frame(width: 32, height: 32)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlowButtonStyle())
 
             Button { showGlossary = true } label: {
-                Image(systemName: "text.book.closed")
+                Image(systemName: "textformat.abc")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(AppColors.menuIcon)
                     .frame(width: 32, height: 32)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlowButtonStyle())
 
             Button { speechManager.cycleFontSize() } label: {
-                HStack(spacing: 0) {
-                    Text("A").font(.system(size: 13, weight: .medium))
-                    Text("A").font(.system(size: 20, weight: .bold))
+                HStack(spacing: 2) {
+                    Text("−").font(.system(size: 13, weight: .medium))
+                    Text("A").font(.system(size: 18, weight: .bold))
+                    Text("+").font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(AppColors.menuIcon)
-                .frame(width: 38, height: 32)
+                .frame(width: 44, height: 32)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlowButtonStyle())
 
             Button { showSettings = true } label: {
                 Image(systemName: "gearshape")
@@ -285,7 +292,7 @@ struct ContentView: View {
                     .foregroundColor(AppColors.menuIcon)
                     .frame(width: 32, height: 32)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlowButtonStyle())
 
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -297,7 +304,7 @@ struct ContentView: View {
                     .foregroundColor(AppColors.menuIcon)
                     .frame(width: 32, height: 32)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlowButtonStyle())
 
             Spacer()
 
@@ -721,13 +728,14 @@ struct DocumentPicker: UIViewControllerRepresentable {
 struct WebBrowserPanel: View {
     @State private var urlText: String = ""
     @State private var currentURL: URL? = nil
+    @State private var customLinks: [(String, String)] = []
+    @State private var showAddLink = false
+    @State private var newLinkTitle = ""
+    @State private var newLinkURL = ""
 
-    private let quickLinks: [(String, String, String)] = [
+    private let defaultLinks: [(String, String, String)] = [
         ("🔍", "Google", "https://www.google.com"),
         ("📗", "N사전", "https://m.dict.naver.com"),
-        ("🌐", "G번역", "https://translate.google.com"),
-        ("📺", "YouTube", "https://m.youtube.com"),
-        ("📰", "Naver", "https://m.naver.com"),
     ]
 
     var body: some View {
@@ -763,28 +771,88 @@ struct WebBrowserPanel: View {
     }
 
     private var quickLinkBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(quickLinks, id: \.1) { emoji, title, url in
-                    Button {
-                        urlText = url
-                        currentURL = URL(string: url)
-                    } label: {
-                        HStack(spacing: 3) {
-                            Text(emoji).font(.system(size: 11))
-                            Text(title).font(.system(size: 10, weight: .medium))
-                        }
-                        .foregroundColor(.primary.opacity(0.7))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color(.systemGray6))
-                        .clipShape(Capsule())
+        VStack(alignment: .leading, spacing: 4) {
+            // 기본 바로가기
+            ForEach(defaultLinks, id: \.1) { emoji, title, url in
+                Button {
+                    urlText = url
+                    currentURL = URL(string: url)
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(emoji).font(.system(size: 11))
+                        Text(title).font(.system(size: 11, weight: .medium))
                     }
-                    .buttonStyle(.plain)
+                    .foregroundColor(.primary.opacity(0.8))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                }
+                .buttonStyle(.plain)
+            }
+
+            // 커스텀 바로가기
+            ForEach(customLinks.indices, id: \.self) { i in
+                Button {
+                    let raw = customLinks[i].1
+                    let url = raw.hasPrefix("http") ? raw : "https://" + raw
+                    urlText = url
+                    currentURL = URL(string: url)
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("🔗").font(.system(size: 11))
+                        Text(customLinks[i].0).font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(.primary.opacity(0.8))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        customLinks.remove(at: i)
+                    } label: {
+                        Label("삭제", systemImage: "trash")
+                    }
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 6)
+
+            // + 추가 버튼
+            Button {
+                newLinkTitle = ""
+                newLinkURL = ""
+                showAddLink = true
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
+                    Text("추가").font(.system(size: 11, weight: .medium))
+                }
+                .foregroundColor(.blue)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.blue.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 8)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .alert("바로가기 추가", isPresented: $showAddLink) {
+            TextField("이름", text: $newLinkTitle)
+            TextField("URL (예: google.com)", text: $newLinkURL)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            Button("추가") {
+                let title = newLinkTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                let url = newLinkURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !title.isEmpty && !url.isEmpty {
+                    customLinks.append((title, url))
+                }
+            }
+            Button("취소", role: .cancel) {}
         }
     }
 
@@ -816,4 +884,23 @@ struct WebBrowserWebView: UIViewRepresentable {
     }
 }
 
+// MARK: - Glow Button Style
 
+struct GlowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(configuration.isPressed
+                          ? Color.blue.opacity(0.15)
+                          : Color.clear)
+                    .blur(radius: configuration.isPressed ? 4 : 0)
+            )
+            .shadow(
+                color: configuration.isPressed ? Color.blue.opacity(0.5) : Color.clear,
+                radius: configuration.isPressed ? 8 : 0
+            )
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
