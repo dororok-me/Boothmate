@@ -35,6 +35,8 @@ struct ContentView: View {
     @State private var showRightPanel = true
     @State private var boothRefresh = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
 
     enum RightPanelTab: String, CaseIterable {
         case dictionary = "사전"
@@ -86,7 +88,7 @@ struct ContentView: View {
             let safeTop = geo.safeAreaInsets.top
             let safeBottom = geo.safeAreaInsets.bottom
             let leftInset: CGFloat = isLandscape ? max(safeLeading, 44) : 0
-            let menuBarHeight: CGFloat = 48
+            let menuBarHeight: CGFloat = 55
             let subtitleWidth = showRightPanel ? totalWidth * 0.65 : totalWidth
             let panelWidth = totalWidth * 0.35
 
@@ -263,14 +265,6 @@ struct ContentView: View {
             Button { speechManager.clearSubtitles() } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(AppColors.menuIcon)
-                    .frame(width: 32, height: 32)
-            }
-            .buttonStyle(GlowButtonStyle())
-
-            Button { showGlossary = true } label: {
-                Image(systemName: "textformat.abc")
-                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(AppColors.menuIcon)
                     .frame(width: 32, height: 32)
             }
@@ -508,7 +502,7 @@ struct ContentView: View {
             }
 
             // 세로 모드 안내
-            if verticalSizeClass == .regular {
+            if verticalSizeClass == .regular && horizontalSizeClass == .compact {
                 Text("이 앱은\n가로 모드에\n최적화되어\n있습니다")
                     .font(.system(size: 22, weight: .bold))
                     .multilineTextAlignment(.center)

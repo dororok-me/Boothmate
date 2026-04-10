@@ -14,7 +14,7 @@ struct SettingsView: View {
                 fontSection
                 themeSection
                 glossarySection
-                azureSection
+                //azureSection
                 exportSection
                 aboutSection
             }
@@ -218,7 +218,7 @@ struct SettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "square.and.arrow.up")
-                        Text("자막을 텍스트 파일로 내보내기")
+                        Text("Copy Subtitles")
                     }
                 }
                 .disabled(speechManager.allSubtitles.isEmpty)
