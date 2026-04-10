@@ -286,8 +286,6 @@ class SpeechManager: ObservableObject {
         audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.reset()
 
-        stopRecording()
-
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
             print("현재 선택된 언어의 음성 인식을 사용할 수 없습니다.")
@@ -418,6 +416,9 @@ class SpeechManager: ObservableObject {
             
             let inputNode = audioEngine.inputNode
             let format = inputNode.outputFormat(forBus: 0)
+            if audioEngine.isRunning {
+                audioEngine.stop()
+            }
             inputNode.removeTap(onBus: 0)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                 recognitionRequest.append(buffer)

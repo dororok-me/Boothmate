@@ -34,6 +34,7 @@ struct ContentView: View {
     @State private var marqueeOffset: CGFloat = 0
     @State private var showRightPanel = true
     @State private var boothRefresh = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     enum RightPanelTab: String, CaseIterable {
         case dictionary = "사전"
@@ -506,7 +507,16 @@ struct ContentView: View {
                 }
             }
 
-
+            // 세로 모드 안내
+            if verticalSizeClass == .regular {
+                Text("이 앱은\n가로 모드에\n최적화되어\n있습니다")
+                    .font(.system(size: 22, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary.opacity(0.25))
+                    .rotationEffect(.degrees(90))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
