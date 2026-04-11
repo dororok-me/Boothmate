@@ -7,9 +7,9 @@ struct DictionaryView: View {
     @State private var currentWord: String = ""
 
     enum DicTab: String, CaseIterable {
-        case eng = "영어"
-        case jp = "일어"
-        case ch = "중어"
+        case eng = "English"
+        case jp = "Japanese"
+        case ch = "Chinese"
 
         var dicCode: String {
             switch self {
@@ -59,23 +59,27 @@ struct DictionaryView: View {
             .background(Color.gray.opacity(0.12))
 
             if let url = currentURL {
-                DaumDictionaryWebView(url: url)
+                            DaumDictionaryWebView(url: url)
             } else {
-                VStack {
-                    Spacer()
-                    Image(systemName: "character.book.closed")
-                        .font(.system(size: 32))
-                        .foregroundColor(.gray.opacity(0.4))
-                        .padding(.bottom, 8)
-                    Text("단어를 탭하면\n사전 검색 결과가 표시됩니다")
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                    Spacer()
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .searchDictionary)) { notification in
+                            GeometryReader { geo in
+                                if geo.size.width > geo.size.height {
+                                    Color.clear
+                                } else {
+                                    VStack(spacing: 4) {
+                                        Spacer()
+                                        ForEach(Array("이 앱은 가로 모드에 최적화되어 있습니다"), id: \.self) { char in
+                                            Text(String(char))
+                                                .font(.system(size: 14))
+                                                .foregroundColor(.gray.opacity(0.35))
+                                        }
+                                        Spacer()
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                            }
+                        }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .searchDictionary)) { notification in
             guard let word = notification.object as? String else { return }
             let trimmed = word.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }

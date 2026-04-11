@@ -16,7 +16,6 @@ struct AppColors {
     static let boothJP = Color.black
     static let tabDictionary = Color(red: 0.6, green: 0.82, blue: 0.88)
     static let tabFile = Color(red: 0.95, green: 0.78, blue: 0.65)
-    static let tabWeb = Color(red: 0.75, green: 0.85, blue: 0.72)
     static let tabMemo = Color(red: 0.88, green: 0.75, blue: 0.92)
     static let tabGM = Color(red: 0.98, green: 0.85, blue: 0.55)
 }
@@ -37,19 +36,16 @@ struct ContentView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-
     enum RightPanelTab: String, CaseIterable {
-        case dictionary = "사전"
-        case file = "파일"
-        case web = "웹"
-        case memo = "메모"
+        case dictionary = "Dict."
+        case file = "File"
+        case memo = "Memo"
         case gm = "GM"
 
         var icon: String {
             switch self {
             case .dictionary: return "text.book.closed"
             case .file: return "doc"
-            case .web: return "globe"
             case .memo: return "note.text"
             case .gm: return "clock.arrow.circlepath"
             }
@@ -59,7 +55,6 @@ struct ContentView: View {
             switch self {
             case .dictionary: return AppColors.tabDictionary
             case .file: return AppColors.tabFile
-            case .web: return AppColors.tabWeb
             case .memo: return AppColors.tabMemo
             case .gm: return AppColors.tabGM
             }
@@ -136,7 +131,6 @@ struct ContentView: View {
             speechManager.glossaryStore = glossaryStore
             speechManager.currencyConverter = currencyConverter
             sendBoothChangedNotification()
-            // 권한 요청과 환율 모두 백그라운드에서
             DispatchQueue.global(qos: .utility).async {
                 SFSpeechRecognizer.requestAuthorization { _ in }
                 AVAudioApplication.requestRecordPermission { _ in }
@@ -191,7 +185,6 @@ struct ContentView: View {
         HStack(spacing: 0) {
             panelTabButton(tab: .dictionary)
             panelTabButton(tab: .file)
-            panelTabButton(tab: .web)
             panelTabButton(tab: .memo)
             panelTabButton(tab: .gm)
             Spacer()
@@ -228,7 +221,6 @@ struct ContentView: View {
         switch selectedPanelTab {
         case .dictionary: DictionaryView()
         case .file: FilePreviewPanel(fileURL: $previewFileURL, bookmarkData: $previewBookmarkData)
-        case .web: WebBrowserPanel()
         case .memo: MemoPanel(text: $memoText)
         case .gm: GMView(gmStore: gmStore, glossaryStore: glossaryStore)
         }
@@ -261,6 +253,14 @@ struct ContentView: View {
 
             recordButton
             languageToggle
+
+            Button { showGlossary = true } label: {
+                Image(systemName: "pencil.and.list.clipboard")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(AppColors.menuIcon)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(GlowButtonStyle())
 
             Button { speechManager.clearSubtitles() } label: {
                 Image(systemName: "trash")
@@ -372,107 +372,102 @@ struct ContentView: View {
 
     // MARK: - Record Button
 
-    // MARK: - Record Button
-
-        private var recordButton: some View {
-            HStack(spacing: 6) {
-                // Start / Stop 버튼 (원형)
-                Button {
-                    if speechManager.isRecording {
-                        speechManager.stopRecording()
-                        marqueeOffset = 0
-                    } else {
-                        speechManager.startRecording()
-                        startMarquee()
-                    }
-                } label: {
-                    if speechManager.isRecording {
-                        transcribingView
-                    } else {
-                        startButtonView
-                    }
-                }
-                .buttonStyle(.plain)
-
-                // Pause 버튼 (항상 보임)
-                pauseResumeButton
-            }
-        }
-
-        private var pauseResumeButton: some View {
+    private var recordButton: some View {
+        HStack(spacing: 6) {
             Button {
                 if speechManager.isRecording {
-                    if speechManager.isPaused {
-                        speechManager.resumeRecording()
-                    } else {
-                        speechManager.pauseRecording()
-                    }
+                    speechManager.stopRecording()
+                    marqueeOffset = 0
+                } else {
+                    speechManager.startRecording()
+                    startMarquee()
                 }
             } label: {
-                ZStack {
-                    Circle()
-                        .fill(speechManager.isPaused ? Color(red: 0.9, green: 0.2, blue: 0.5) : Color.gray.opacity(0.25))
-                        .frame(width: 36, height: 36)
-
-                    if speechManager.isPaused {
-                        Text("||")
-                            .font(.system(size: 11, weight: .black, design: .monospaced))
-                            .foregroundColor(.white)
-                    } else {
-                        Image(systemName: "pause.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.gray.opacity(0.5))
-                    }
+                if speechManager.isRecording {
+                    transcribingView
+                } else {
+                    startButtonView
                 }
             }
             .buttonStyle(.plain)
-            .opacity(speechManager.isRecording ? 1.0 : 0.3)
-            .disabled(!speechManager.isRecording)
+
+            pauseResumeButton
         }
+    }
 
-        private var transcribingView: some View {
-            ZStack {
-                Circle()
-                    .fill(Color.red.opacity(0.85))
-                    .frame(width: 36, height: 36)
-
-                // 두 개의 텍스트로 자연스럽게 연속 흐르기
-                ZStack {
-                    Text("Transcribing")
-                        .font(.system(size: 7, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .fixedSize()
-                        .offset(x: marqueeOffset)
-
-                    Text("Transcribing")
-                        .font(.system(size: 7, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .fixedSize()
-                        .offset(x: marqueeOffset + 100)
+    private var pauseResumeButton: some View {
+        Button {
+            if speechManager.isRecording {
+                if speechManager.isPaused {
+                    speechManager.resumeRecording()
+                } else {
+                    speechManager.pauseRecording()
                 }
             }
-            .frame(width: 36, height: 36)
-            .clipShape(Circle())
-        }
-
-        private var startButtonView: some View {
+        } label: {
             ZStack {
                 Circle()
-                    .fill(Color(red: 0.25, green: 0.78, blue: 0.65))
+                    .fill(speechManager.isPaused ? Color(red: 0.9, green: 0.2, blue: 0.5) : Color.gray.opacity(0.25))
                     .frame(width: 36, height: 36)
 
-                Image(systemName: "play.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
+                if speechManager.isPaused {
+                    Text("||")
+                        .font(.system(size: 11, weight: .black, design: .monospaced))
+                        .foregroundColor(.white)
+                } else {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.gray.opacity(0.5))
+                }
             }
         }
+        .buttonStyle(.plain)
+        .opacity(speechManager.isRecording ? 1.0 : 0.3)
+        .disabled(!speechManager.isRecording)
+    }
 
-        private func startMarquee() {
-            marqueeOffset = 30
-            withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
-                marqueeOffset = -70
+    private var transcribingView: some View {
+        ZStack {
+            Circle()
+                .fill(Color.red.opacity(0.85))
+                .frame(width: 36, height: 36)
+
+            ZStack {
+                Text("Transcribing")
+                    .font(.system(size: 7, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .fixedSize()
+                    .offset(x: marqueeOffset)
+
+                Text("Transcribing")
+                    .font(.system(size: 7, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .fixedSize()
+                    .offset(x: marqueeOffset + 100)
             }
         }
+        .frame(width: 36, height: 36)
+        .clipShape(Circle())
+    }
+
+    private var startButtonView: some View {
+        ZStack {
+            Circle()
+                .fill(Color(red: 0.25, green: 0.78, blue: 0.65))
+                .frame(width: 36, height: 36)
+
+            Image(systemName: "play.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(.white)
+        }
+    }
+
+    private func startMarquee() {
+        marqueeOffset = 30
+        withAnimation(.linear(duration: 3.5).repeatForever(autoreverses: false)) {
+            marqueeOffset = -70
+        }
+    }
 
     // MARK: - Subtitle Area
 
@@ -501,7 +496,6 @@ struct ContentView: View {
                 }
             }
 
-            // 세로 모드 안내
             if verticalSizeClass == .regular && horizontalSizeClass == .compact {
                 Text("이 앱은\n가로 모드에\n최적화되어\n있습니다")
                     .font(.system(size: 22, weight: .bold))
@@ -539,7 +533,6 @@ struct ContentView: View {
                     object: word,
                     userInfo: ["language": dicLanguage]
                 )
-                // GM에 검색 기록 저장
                 gmStore.add(word: word)
                 if !showRightPanel {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -724,167 +717,6 @@ struct DocumentPicker: UIViewControllerRepresentable {
         func documentPicker(_ c: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             if let url = urls.first { _ = url.startAccessingSecurityScopedResource(); onPick(url) }
         }
-    }
-}
-
-// MARK: - 웹 브라우저 패널
-
-struct WebBrowserPanel: View {
-    @State private var urlText: String = ""
-    @State private var currentURL: URL? = nil
-    @State private var customLinks: [(String, String)] = []
-    @State private var showAddLink = false
-    @State private var newLinkTitle = ""
-    @State private var newLinkURL = ""
-
-    private let defaultLinks: [(String, String, String)] = [
-        ("🔍", "Google", "https://www.google.com"),
-        ("📗", "N사전", "https://m.dict.naver.com"),
-    ]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            urlInputBar
-            quickLinkBar
-
-            if let url = currentURL {
-                WebBrowserWebView(url: url)
-            } else {
-                emptyWebView
-            }
-        }
-    }
-
-    private var urlInputBar: some View {
-        HStack(spacing: 6) {
-            TextField("URL 입력", text: $urlText)
-                .font(.system(size: 12))
-                .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
-                .onSubmit { loadURL() }
-            Button { loadURL() } label: {
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.blue)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-    }
-
-    private var quickLinkBar: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // 기본 바로가기
-            ForEach(defaultLinks, id: \.1) { emoji, title, url in
-                Button {
-                    urlText = url
-                    currentURL = URL(string: url)
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(emoji).font(.system(size: 11))
-                        Text(title).font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundColor(.primary.opacity(0.8))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-                }
-                .buttonStyle(.plain)
-            }
-
-            // 커스텀 바로가기
-            ForEach(customLinks.indices, id: \.self) { i in
-                Button {
-                    let raw = customLinks[i].1
-                    let url = raw.hasPrefix("http") ? raw : "https://" + raw
-                    urlText = url
-                    currentURL = URL(string: url)
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("🔗").font(.system(size: 11))
-                        Text(customLinks[i].0).font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundColor(.primary.opacity(0.8))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-                }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button(role: .destructive) {
-                        customLinks.remove(at: i)
-                    } label: {
-                        Label("삭제", systemImage: "trash")
-                    }
-                }
-            }
-
-            // + 추가 버튼
-            Button {
-                newLinkTitle = ""
-                newLinkURL = ""
-                showAddLink = true
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
-                    Text("추가").font(.system(size: 11, weight: .medium))
-                }
-                .foregroundColor(.blue)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.blue.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .alert("바로가기 추가", isPresented: $showAddLink) {
-            TextField("이름", text: $newLinkTitle)
-            TextField("URL (예: google.com)", text: $newLinkURL)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-            Button("추가") {
-                let title = newLinkTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                let url = newLinkURL.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !title.isEmpty && !url.isEmpty {
-                    customLinks.append((title, url))
-                }
-            }
-            Button("취소", role: .cancel) {}
-        }
-    }
-
-    private var emptyWebView: some View {
-        VStack {
-            Spacer()
-            Image(systemName: "globe").font(.system(size: 32)).foregroundColor(.gray.opacity(0.4)).padding(.bottom, 8)
-            Text("URL을 입력하세요").font(.system(size: 14)).foregroundColor(.gray)
-            Spacer()
-        }
-    }
-
-    private func loadURL() {
-        var input = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !input.isEmpty else { return }
-        if !input.hasPrefix("http://") && !input.hasPrefix("https://") { input = "https://" + input }
-        if let url = URL(string: input) { currentURL = url }
-    }
-}
-
-struct WebBrowserWebView: UIViewRepresentable {
-    let url: URL
-    func makeUIView(context: Context) -> WKWebView {
-        let w = WKWebView(); w.allowsBackForwardNavigationGestures = true
-        w.scrollView.keyboardDismissMode = .onDrag; w.load(URLRequest(url: url)); return w
-    }
-    func updateUIView(_ w: WKWebView, context: Context) {
-        if w.url?.absoluteString != url.absoluteString { w.load(URLRequest(url: url)) }
     }
 }
 
