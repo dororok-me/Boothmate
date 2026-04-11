@@ -153,7 +153,7 @@ class SpeechManager: ObservableObject {
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private let audioEngine = AVAudioEngine()
+    private var audioEngine = AVAudioEngine()
     
     // currentText throttle
     private var lastUpdateTime: Date = .distantPast
@@ -284,7 +284,7 @@ class SpeechManager: ObservableObject {
             audioEngine.stop()
         }
         audioEngine.inputNode.removeTap(onBus: 0)
-        audioEngine.reset()
+        audioEngine = AVAudioEngine()
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
@@ -307,13 +307,11 @@ class SpeechManager: ObservableObject {
             recognitionRequest.shouldReportPartialResults = true
 
             let inputNode = audioEngine.inputNode
-                        inputNode.removeTap(onBus: 0)
-                        let format = inputNode.outputFormat(forBus: 0)
-                        guard format.sampleRate > 0 else {
-                            print("오디오 포맷 오류: sampleRate = 0")
-                            return
-                        }
-                        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+            if audioEngine.isRunning {
+                audioEngine.stop()
+            }
+            inputNode.removeTap(onBus: 0)
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
 
@@ -419,16 +417,12 @@ class SpeechManager: ObservableObject {
             recognitionRequest.shouldReportPartialResults = true
             
             let inputNode = audioEngine.inputNode
-                        if audioEngine.isRunning {
-                            audioEngine.stop()
-                        }
-                        inputNode.removeTap(onBus: 0)
-                        let format = inputNode.outputFormat(forBus: 0)
-                        guard format.sampleRate > 0 else {
-                            print("오디오 포맷 오류: sampleRate = 0")
-                            return
-                        }
-                        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+            if audioEngine.isRunning {
+                audioEngine.stop()
+            }
+            audioEngine.inputNode.removeTap(onBus: 0)
+            audioEngine = AVAudioEngine()
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
             
