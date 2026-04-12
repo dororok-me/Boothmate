@@ -148,7 +148,7 @@ struct VerticalContentView: View {
             HStack {
                 Spacer()
 
-                // 일시정지 (갈고리 모양)
+                // 일시정지
                 Button {
                     guard speechManager.isRecording else { return }
                     if speechManager.isPaused {
@@ -159,7 +159,7 @@ struct VerticalContentView: View {
                 } label: {
                     Image(systemName: "pause.circle")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(speechManager.isPaused ? Color.orange : AppColors.menuIcon)
+                        .foregroundColor(speechManager.isPaused ? Color.orange : speechManager.selectedTheme.iconColor)
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(GlowButtonStyle())
@@ -169,7 +169,7 @@ struct VerticalContentView: View {
                 Button { showGlossarySheet = true } label: {
                     Image(systemName: "pencil.and.list.clipboard")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppColors.menuIcon)
+                        .foregroundColor(speechManager.selectedTheme.iconColor)
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(GlowButtonStyle())
@@ -177,7 +177,7 @@ struct VerticalContentView: View {
                 Button { speechManager.clearSubtitles() } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppColors.menuIcon)
+                        .foregroundColor(speechManager.selectedTheme.iconColor)
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(GlowButtonStyle())
@@ -188,7 +188,7 @@ struct VerticalContentView: View {
                         Text("A").font(.system(size: 15, weight: .bold))
                         Text("+").font(.system(size: 11, weight: .medium))
                     }
-                    .foregroundColor(AppColors.menuIcon)
+                    .foregroundColor(speechManager.selectedTheme.iconColor)
                     .frame(width: 40, height: 28)
                 }
                 .buttonStyle(GlowButtonStyle())
@@ -196,7 +196,7 @@ struct VerticalContentView: View {
                 Button { showSettingsSheet = true } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppColors.menuIcon)
+                        .foregroundColor(speechManager.selectedTheme.iconColor)
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(GlowButtonStyle())
