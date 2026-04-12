@@ -324,8 +324,12 @@ struct VerticalContentView: View {
                 Text(name)
                     .font(.system(size: 11, weight: .semibold))
                     .frame(width: 28, height: 28)
-                    .background(speechManager.selectedLanguage == code ? boothColor : Color.gray.opacity(0.12))
-                    .foregroundColor(speechManager.selectedLanguage == code ? .white : .primary)
+                    .background(speechManager.selectedLanguage == code
+                                ? boothColor
+                                : speechManager.selectedTheme.iconColor.opacity(0.12))
+                    .foregroundColor(speechManager.selectedLanguage == code
+                                     ? .white
+                                     : speechManager.selectedTheme.iconColor)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             .buttonStyle(.plain)
