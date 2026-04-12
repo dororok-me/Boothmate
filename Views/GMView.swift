@@ -82,7 +82,9 @@ struct GMView: View {
                             } else {
                                 Button {
                                     selectedWord = entry.word
-                                    showAddSheet = true
+                                    DispatchQueue.main.async {
+                                        showAddSheet = true
+                                    }
                                 } label: {
                                     Image(systemName: "plus.circle")
                                         .font(.system(size: 18))

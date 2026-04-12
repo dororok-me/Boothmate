@@ -90,7 +90,7 @@ enum BoothMode: String, CaseIterable, Identifiable {
     }
     var defaultLanguage: String {
         switch self {
-        case .kr: return "ko-KR"
+        case .kr: return "en-US"
         case .cn: return "zh-CN"
         case .jp: return "ja-JP"
         }
@@ -115,7 +115,7 @@ class SpeechManager: ObservableObject {
     @Published var currentText: String = ""
     @Published var isRecording: Bool = false
     @Published var isPaused: Bool = false
-    @Published var selectedLanguage: String = "ko-KR"
+    @Published var selectedLanguage: String = "en-US"
     @Published var fontSize: CGFloat = 22
     @Published var lineSpacing: CGFloat = 8
     @Published var selectedTheme: SubtitleTheme = .normal
@@ -245,7 +245,6 @@ class SpeechManager: ObservableObject {
     func startRecording() {
         // UI 즉시 반응
         isRecording = true
-        NotificationCenter.default.post(name: NSNotification.Name("recordingStateChanged"), object: true)
 
         // 1. 음성 인식 권한 확인
         guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
@@ -403,33 +402,36 @@ class SpeechManager: ObservableObject {
     private func startRecognitionOnly() {
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else { return }
-        
+
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.record, mode: .measurement, options: [.duckOthers, .allowBluetooth])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            
+
             if let preferredInput = audioSession.availableInputs?.first(where: { $0.portType == .usbAudio }) {
                 try audioSession.setPreferredInput(preferredInput)
             }
-            
+
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             guard let recognitionRequest = recognitionRequest else { return }
             recognitionRequest.shouldReportPartialResults = true
-            
-            let inputNode = audioEngine.inputNode
+
+            // 기존 엔진 완전 정리 후 새 엔진 생성
             if audioEngine.isRunning {
                 audioEngine.stop()
             }
             audioEngine.inputNode.removeTap(onBus: 0)
             audioEngine = AVAudioEngine()
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
+
+            // 새 엔진의 inputNode에 tap 설치
+            let newInputNode = audioEngine.inputNode
+            newInputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
-            
+
             audioEngine.prepare()
             try audioEngine.start()
-            
+
             recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 Task { @MainActor in
                     guard let self = self else { return }
@@ -450,6 +452,7 @@ class SpeechManager: ObservableObject {
             }
         } catch {
             print("리스타트 오류: \(error.localizedDescription)")
+            isRestarting = false
         }
     }
     
@@ -477,7 +480,6 @@ class SpeechManager: ObservableObject {
         isRestarting = false
         timer?.invalidate()
         timer = nil
-        NotificationCenter.default.post(name: NSNotification.Name("recordingStateChanged"), object: false)
         
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {

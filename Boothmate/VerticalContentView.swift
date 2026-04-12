@@ -14,6 +14,12 @@ struct VerticalContentView: View {
     @State private var handleUnlocked: Bool = false
     @State private var cachedAvailableHeight: CGFloat = 0
     @State private var dragStartRatio: CGFloat = 0
+    @State private var isFullscreen: Bool = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var isLandscapeMode: Bool = false
+    @State private var landscapeSafeLeading: CGFloat = 0
+    @State private var landscapeSafeTrailing: CGFloat = 0
 
     // 하단 탭
     @State private var selectedTab: RightPanelTab = .dictionary
@@ -39,6 +45,22 @@ struct VerticalContentView: View {
             case .gm:         return "clock.arrow.circlepath"
             }
         }
+        var iconFilled: String {
+            switch self {
+            case .dictionary: return "text.book.closed.fill"
+            case .file:       return "doc.fill"
+            case .memo:       return "note.text"
+            case .gm:         return "clock.arrow.circlepath"
+            }
+        }
+        var activeColor: Color {
+            switch self {
+            case .dictionary: return Color(red: 0.2, green: 0.5, blue: 1.0)
+            case .file:       return Color(red: 1.0, green: 0.5, blue: 0.2)
+            case .memo:       return Color(red: 0.4, green: 0.75, blue: 0.4)
+            case .gm:         return Color(red: 0.8, green: 0.3, blue: 0.7)
+            }
+        }
         var label: String {
             switch self {
             case .dictionary: return "사전"
@@ -57,54 +79,68 @@ struct VerticalContentView: View {
         }
     }
 
+    // 가로모드 드래그
+    @State private var leftRatio: CGFloat = 0.6
+    @State private var isLandscapeDragging: Bool = false
+    @State private var landscapeDragStartRatio: CGFloat = 0.6
+
     var body: some View {
         GeometryReader { geo in
-            let safeTop = geo.safeAreaInsets.top
-            let totalHeight = geo.size.height
-            let handleHeight: CGFloat = 24
-            let availableHeight = totalHeight - handleHeight - safeTop
-            let topHeight = min(max(availableHeight * topRatio, availableHeight * 0.2), availableHeight * 0.8)
-
-            VStack(spacing: 0) {
-
-                // 다이나믹 아일랜드 / 노치 여유
-                Color(.systemBackground).frame(height: safeTop * 0.3)
-
-                // MARK: - 상단 자막창
-                subtitlePanel
-                    .frame(height: topHeight)
-                    .background(speechManager.selectedTheme.backgroundColor)
-
-                // MARK: - 드래그 핸들
-                dragHandle
-                    .frame(height: handleHeight)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                            .onChanged { value in
-                                if !isDragging {
-                                    isDragging = true
-                                    dragStartRatio = topRatio
-                                }
-                                let delta = value.translation.height / availableHeight
-                                topRatio = min(max(dragStartRatio + delta, 0.2), 0.8)
-                            }
-                            .onEnded { _ in
-                                isDragging = false
-                            }
-                    )
-                    .onAppear {
-                        cachedAvailableHeight = availableHeight
-                    }
-                    .onChange(of: availableHeight) { newVal in
-                        cachedAvailableHeight = newVal
-                    }
-
-                // MARK: - 하단 패널
-                bottomPanel
-                    .frame(maxHeight: .infinity)
+            let landscape = geo.size.width > geo.size.height
+            Group {
+                if landscape {
+                    landscapeLayout
+                } else {
+                    portraitLayout
+                }
             }
-            .ignoresSafeArea(edges: .bottom)
+            .onAppear { isLandscapeMode = landscape }
+            .onChange(of: landscape) { newVal in
+                isLandscapeMode = newVal
+                if !newVal { isFullscreen = false }
+            }
+        }
+    }
+
+    // MARK: - 세로 레이아웃
+
+    private var portraitLayout: some View {
+        VStack(spacing: 0) {
+            GeometryReader { geo in
+                let totalHeight = geo.size.height
+                let handleHeight: CGFloat = 24
+                let availableHeight = totalHeight - handleHeight
+                let topHeight = isFullscreen
+                    ? totalHeight
+                    : min(max(availableHeight * topRatio, availableHeight * 0.2), availableHeight * 0.8)
+
+                VStack(spacing: 0) {
+                    subtitlePanel()
+                        .frame(height: topHeight)
+                        .background(speechManager.selectedTheme.backgroundColor)
+
+                    if !isFullscreen {
+                        dragHandle
+                            .frame(height: handleHeight)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                                    .onChanged { value in
+                                        if !isDragging {
+                                            isDragging = true
+                                            dragStartRatio = topRatio
+                                        }
+                                        let delta = value.translation.height / availableHeight
+                                        topRatio = min(max(dragStartRatio + delta, 0.2), 0.8)
+                                    }
+                                    .onEnded { _ in isDragging = false }
+                            )
+
+                        bottomPanel
+                            .frame(maxHeight: .infinity)
+                    }
+                }
+            }
         }
         .alert("언어 변경", isPresented: $showLanguageAlert) {
             Button("확인", role: .cancel) {}
@@ -126,27 +162,169 @@ struct VerticalContentView: View {
         .sheet(isPresented: $showSettingsSheet) {
             SettingsView(speechManager: speechManager)
         }
-        .onAppear {
-            if speechManager.isRecording { startMarquee() }
-        }
-        .onChange(of: speechManager.isRecording) { recording in
-            if recording {
-                startMarquee()
-            } else {
-                marqueeOffset = 0
+        .onAppear { if speechManager.isRecording { startMarquee() } }
+        .onChange(of: speechManager.isRecording) { if !$0 { marqueeOffset = 0 } }
+    }
+
+    // MARK: - 가로 레이아웃
+
+    private var landscapeLayout: some View {
+        GeometryReader { geo in
+            let safeLeading = max(geo.safeAreaInsets.leading, 59)
+            let safeTrailing = geo.safeAreaInsets.trailing
+            let safeTop = geo.safeAreaInsets.top
+            let safeBottom = geo.safeAreaInsets.bottom
+            let totalWidth = geo.size.width
+            let totalHeight = geo.size.height
+            let handleWidth: CGFloat = 18
+
+            // 실제 콘텐츠 너비 (safeArea 제외한 순수 영역)
+            let contentWidth = totalWidth
+            let leftWidth = isFullscreen
+                ? contentWidth
+                : min(max(contentWidth * leftRatio, contentWidth * 0.3), contentWidth * 0.8)
+            let rightWidth = contentWidth - leftWidth - handleWidth
+
+            ZStack(alignment: .topLeading) {
+                // 배경
+                HStack(spacing: 0) {
+                    speechManager.selectedTheme.backgroundColor
+                        .frame(width: leftWidth + safeLeading)
+                    if !isFullscreen {
+                        Color(.systemGray5).frame(width: handleWidth)
+                        Color(.systemGray6)
+                            .frame(width: rightWidth + safeTrailing)
+                    }
+                }
+                .ignoresSafeArea()
+
+                // 콘텐츠
+                HStack(spacing: 0) {
+                    // 좌측: 자막창 (safeLeading을 내부 패딩으로 전달)
+                    subtitlePanel(leadingPadding: safeLeading)
+                        .padding(.top, safeTop)
+                        .frame(width: leftWidth + safeLeading, height: totalHeight)
+
+                    if !isFullscreen {
+                        // 드래그 핸들
+                        ZStack {
+                            Color(.systemGray5)
+                            Rectangle()
+                                .fill(isLandscapeDragging ? Color(.systemGray2) : Color(.systemGray4))
+                                .frame(width: 1)
+                            Image(systemName: "chevron.left.chevron.right")
+                                .font(.system(size: 9, weight: isLandscapeDragging ? .semibold : .light))
+                                .foregroundColor(isLandscapeDragging ? Color(.systemGray) : Color(.systemGray3))
+                                .background(Color(.systemGray5))
+                        }
+                        .frame(width: handleWidth, height: totalHeight)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                                .onChanged { value in
+                                    if !isLandscapeDragging {
+                                        isLandscapeDragging = true
+                                        landscapeDragStartRatio = leftRatio
+                                    }
+                                    let delta = value.translation.width / contentWidth
+                                    leftRatio = min(max(landscapeDragStartRatio + delta, 0.3), 0.8)
+                                }
+                                .onEnded { _ in isLandscapeDragging = false }
+                        )
+
+                        // 우측: 탭 패널 (safeTrailing 포함)
+                        VStack(spacing: 0) {
+                            landscapeTabBar
+                            landscapePanelContent
+                        }
+                        .padding(.bottom, safeBottom)
+                        .frame(width: rightWidth + safeTrailing, height: totalHeight)
+                        .background(Color(.systemGray6))
+                    }
+                }
+                .ignoresSafeArea()
             }
+        }
+        .alert("언어 변경", isPresented: $showLanguageAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("녹음을 정지한 후 언어를 변경해 주세요")
+        }
+        .alert("Booth 변경", isPresented: $showBoothAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("녹음을 정지한 후 Booth를 변경해 주세요")
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+                .interactiveDismissDisabled(!subscriptionManager.canUseApp)
+        }
+        .sheet(isPresented: $showGlossarySheet) {
+            GlossaryView(glossaryStore: glossaryStore)
+        }
+        .sheet(isPresented: $showSettingsSheet) {
+            SettingsView(speechManager: speechManager)
+        }
+        .onAppear { if speechManager.isRecording { startMarquee() } }
+        .onChange(of: speechManager.isRecording) { if !$0 { marqueeOffset = 0 } }
+    }
+
+    // MARK: - 가로 탭바
+
+    private var landscapeTabBar: some View {
+        HStack(spacing: 0) {
+            ForEach([RightPanelTab.dictionary, .file, .memo, .gm], id: \.label) { tab in
+                Button {
+                    selectedTab = tab
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: tab.icon).font(.system(size: 14))
+                        Text(tab.label).font(.system(size: 9))
+                    }
+                    .foregroundColor(selectedTab == tab ? .primary : .gray)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(Color(.systemBackground))
+        .overlay(Rectangle().frame(height: 0.5).foregroundColor(Color(.systemGray4)), alignment: .bottom)
+    }
+
+    @ViewBuilder
+    private var landscapePanelContent: some View {
+        switch selectedTab {
+        case .dictionary: DictionaryView(hideTabs: true)
+        case .file:       verticalFilePanel
+        case .memo:       MemoPanel(text: $memoText, hideHeader: true)
+        case .gm:         GMView(gmStore: gmStore, glossaryStore: glossaryStore, hideHeader: true)
         }
     }
 
     // MARK: - 상단 자막창
 
-    private var subtitlePanel: some View {
+    private func subtitlePanel(leadingPadding: CGFloat = 0) -> some View {
         VStack(spacing: 0) {
 
-            // 상단 우측 툴바 — 글로서리, 휴지통, A+, 설정
-            // 상단 우측 툴바 — 글로서리, 휴지통, A+, 설정 + 일시정지
+            // 상단 우측 툴바
             HStack {
                 Spacer()
+
+                // 전체화면 버튼 (가로모드일 때만)
+                if isLandscapeMode {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            isFullscreen.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(isFullscreen ? .blue : speechManager.selectedTheme.iconColor)
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(GlowButtonStyle())
+                }
 
                 // 일시정지
                 Button {
@@ -201,7 +379,8 @@ struct VerticalContentView: View {
                 }
                 .buttonStyle(GlowButtonStyle())
             }
-            .padding(.horizontal, 8)
+            .padding(.leading, 8 + leadingPadding)
+            .padding(.trailing, 8)
             .padding(.vertical, 2)
 
             // 자막 스크롤
@@ -211,11 +390,11 @@ struct VerticalContentView: View {
                         Color.clear.frame(height: 8)
 
                         ForEach(Array(speechManager.subtitles.enumerated()), id: \.offset) { index, subtitle in
-                            subtitleBlock(text: subtitle).id(index)
+                            subtitleBlock(text: subtitle, leadingPadding: leadingPadding).id(index)
                         }
 
                         if !speechManager.currentText.isEmpty {
-                            subtitleBlock(text: speechManager.currentText).id("current")
+                            subtitleBlock(text: speechManager.currentText, leadingPadding: leadingPadding).id("current")
                         }
 
                         Color.clear.frame(height: 20).id("bottomAnchor")
@@ -228,10 +407,11 @@ struct VerticalContentView: View {
 
             controlBar
                 .padding(.vertical, 8)
+                .padding(.leading, leadingPadding)
         }
     }
 
-    private func subtitleBlock(text: String) -> some View {
+    private func subtitleBlock(text: String, leadingPadding: CGFloat = 0) -> some View {
         TappableText(
             text: text,
             fontSize: speechManager.fontSize,
@@ -259,7 +439,8 @@ struct VerticalContentView: View {
             }
         )
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
+        .padding(.leading, 16 + leadingPadding)
+        .padding(.trailing, 16)
     }
 
     // MARK: - 컨트롤 바
@@ -453,22 +634,24 @@ struct VerticalContentView: View {
                     selectedTab = tab
                 } label: {
                     VStack(spacing: 3) {
-                        Image(systemName: tab.icon).font(.system(size: 18))
-                        Text(tab.label).font(.system(size: 10))
+                        Image(systemName: selectedTab == tab ? tab.iconFilled : tab.icon)
+                            .font(.system(size: 15, weight: selectedTab == tab ? .bold : .regular))
+                            .foregroundColor(selectedTab == tab ? tab.activeColor : .gray.opacity(0.6))
+                        Text(tab.label)
+                            .font(.system(size: 8, weight: selectedTab == tab ? .bold : .regular))
+                            .foregroundColor(selectedTab == tab ? tab.activeColor : .gray.opacity(0.6))
                     }
-                    .foregroundColor(selectedTab == tab ? .primary : .gray)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .buttonStyle(.plain)
             }
         }
+        .frame(height: 40)
         .background(Color(.systemBackground))
         .overlay(
             Rectangle().frame(height: 0.5).foregroundColor(Color(.systemGray4)),
             alignment: .top
         )
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 0) }
     }
 
     // MARK: - Helpers
@@ -489,10 +672,11 @@ struct VerticalContentView: View {
 struct MarqueeText: View {
     let text: String
     let fontSize: CGFloat = 6
-    @State private var animate = false
+    @State private var offset: CGFloat = 18
+    @State private var isRunning = false
 
-    // 텍스트 너비 추정 (6pt monospaced 기준 약 5.5pt/자)
     private var textWidth: CGFloat { CGFloat(text.count) * 5.5 + 12 }
+    private let duration: Double = 6.0
 
     var body: some View {
         ZStack {
@@ -500,20 +684,32 @@ struct MarqueeText: View {
                 .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
                 .fixedSize()
-                .offset(x: animate ? -textWidth : 18)
+                .offset(x: offset)
             Text(text)
                 .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
                 .fixedSize()
-                .offset(x: animate ? 18 : 18 + textWidth)
+                .offset(x: offset + textWidth)
         }
-        .onAppear {
-            withAnimation(.linear(duration: Double(textWidth) / 22.0).repeatForever(autoreverses: false)) {
-                animate = true
-            }
+        .onAppear { startLoop() }
+        .onDisappear { isRunning = false }
+    }
+
+    private func startLoop() {
+        isRunning = true
+        offset = 18
+        animate()
+    }
+
+    private func animate() {
+        guard isRunning else { return }
+        withAnimation(.linear(duration: duration)) {
+            offset = 18 - textWidth
         }
-        .onDisappear {
-            animate = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            guard isRunning else { return }
+            offset = 18
+            animate()
         }
     }
 }
