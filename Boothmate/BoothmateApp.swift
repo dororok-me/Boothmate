@@ -4,7 +4,7 @@ import SwiftUI
 struct BoothmateApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .preferredColorScheme(.light)
                 .onAppear {
                     UIApplication.shared.isIdleTimerDisabled = true

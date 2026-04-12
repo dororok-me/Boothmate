@@ -90,7 +90,7 @@ enum BoothMode: String, CaseIterable, Identifiable {
     }
     var defaultLanguage: String {
         switch self {
-        case .kr: return "en-US"
+        case .kr: return "ko-KR"
         case .cn: return "zh-CN"
         case .jp: return "ja-JP"
         }
@@ -115,7 +115,7 @@ class SpeechManager: ObservableObject {
     @Published var currentText: String = ""
     @Published var isRecording: Bool = false
     @Published var isPaused: Bool = false
-    @Published var selectedLanguage: String = "en-US"
+    @Published var selectedLanguage: String = "ko-KR"
     @Published var fontSize: CGFloat = 22
     @Published var lineSpacing: CGFloat = 8
     @Published var selectedTheme: SubtitleTheme = .normal
@@ -245,6 +245,7 @@ class SpeechManager: ObservableObject {
     func startRecording() {
         // UI 즉시 반응
         isRecording = true
+        NotificationCenter.default.post(name: NSNotification.Name("recordingStateChanged"), object: true)
 
         // 1. 음성 인식 권한 확인
         guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
@@ -476,6 +477,7 @@ class SpeechManager: ObservableObject {
         isRestarting = false
         timer?.invalidate()
         timer = nil
+        NotificationCenter.default.post(name: NSNotification.Name("recordingStateChanged"), object: false)
         
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {

@@ -3,6 +3,7 @@ import SwiftUI
 struct GMView: View {
     @ObservedObject var gmStore: GMStore
     @ObservedObject var glossaryStore: GlossaryStore
+    var hideHeader: Bool = false
 
     @State private var selectedWord: String = ""
     @State private var showAddSheet = false
@@ -10,25 +11,28 @@ struct GMView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 헤더
-            HStack {
-                Text("글로서리 검색 리스트")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.secondary)
-                Spacer()
-                if !gmStore.entries.isEmpty {
-                    Button {
-                        showDeleteAllAlert = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 12))
-                            .foregroundColor(.red.opacity(0.7))
+
+            // hideHeader가 false일 때만 헤더 표시
+            if !hideHeader {
+                HStack {
+                    Text("검색 기록")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    if !gmStore.entries.isEmpty {
+                        Button {
+                            showDeleteAllAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 12))
+                                .foregroundColor(.red.opacity(0.7))
+                        }
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.gray.opacity(0.06))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.06))
 
             if gmStore.entries.isEmpty {
                 Spacer()
@@ -43,6 +47,22 @@ struct GMView: View {
                 }
                 Spacer()
             } else {
+                // hideHeader일 때 쓰레기통을 리스트 위 우측에 배치
+                if hideHeader && !gmStore.entries.isEmpty {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showDeleteAllAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 12))
+                                .foregroundColor(.red.opacity(0.6))
+                                .padding(8)
+                        }
+                    }
+                    .padding(.trailing, 4)
+                }
+
                 List {
                     ForEach(gmStore.entries) { entry in
                         HStack(spacing: 8) {
@@ -54,9 +74,7 @@ struct GMView: View {
                                     .font(.system(size: 10))
                                     .foregroundColor(.secondary)
                             }
-
                             Spacer()
-
                             if isInGlossary(entry.word) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 16))
@@ -84,109 +102,79 @@ struct GMView: View {
         }
         .alert("기록 전체 삭제", isPresented: $showDeleteAllAlert) {
             Button("삭제", role: .destructive) { gmStore.deleteAll() }
-            Button("취소", role: .cancel) { }
+            Button("취소", role: .cancel) {}
         } message: {
             Text("검색 기록을 모두 삭제하시겠습니까?")
         }
         .sheet(isPresented: $showAddSheet) {
-            AddToGlossarySheet(word: selectedWord) { source, target in
-                glossaryStore.add(source: source, target: target)
-                showAddSheet = false
-            } onCancel: {
-                showAddSheet = false
-            }
-            .presentationDetents([.fraction(0.35)])
-            .presentationDragIndicator(.visible)
+            AddToGlossarySheet(
+                word: selectedWord,
+                glossaryStore: glossaryStore,
+                isPresented: $showAddSheet
+            )
         }
     }
 
     private func isInGlossary(_ word: String) -> Bool {
-        let lower = word.lowercased()
-        return glossaryStore.entries.contains(where: {
-            $0.source.lowercased() == lower ||
-            $0.target.lowercased() == lower ||
-            $0.synonyms.contains(where: { $0.lowercased() == lower })
-        })
+        glossaryStore.entries.contains {
+            $0.source.lowercased() == word.lowercased() ||
+            $0.target.lowercased() == word.lowercased()
+        }
     }
 
     private func timeAgo(_ date: Date) -> String {
-        let seconds = Int(-date.timeIntervalSinceNow)
-        if seconds < 60 { return "방금" }
-        if seconds < 3600 { return "\(seconds / 60)분 전" }
-        if seconds < 86400 { return "\(seconds / 3600)시간 전" }
-        return "\(seconds / 86400)일 전" 
+        let diff = Date().timeIntervalSince(date)
+        if diff < 60 { return "방금 전" }
+        if diff < 3600 { return "\(Int(diff/60))분 전" }
+        if diff < 86400 { return "\(Int(diff/3600))시간 전" }
+        return "\(Int(diff/86400))일 전"
     }
 }
 
-// MARK: - 글로서리 추가 시트
+// MARK: - 글로서리 추가 Sheet
 
 struct AddToGlossarySheet: View {
     let word: String
-    let onAdd: (String, String) -> Void
-    let onCancel: () -> Void
+    @ObservedObject var glossaryStore: GlossaryStore
+    @Binding var isPresented: Bool
 
     @State private var sourceText: String = ""
     @State private var targetText: String = ""
 
     var body: some View {
-        ZStack {
-            Color(.systemBackground).ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // 헤더
-                HStack {
-                    Button("취소") { onCancel() }
-                        .foregroundColor(.blue)
-                    Spacer()
-                    Text("글로서리에 추가")
-                        .font(.system(size: 16, weight: .semibold))
-                    Spacer()
+        NavigationView {
+            Form {
+                Section("원어") {
+                    TextField("원어", text: $sourceText)
+                }
+                Section("번역") {
+                    TextField("번역어", text: $targetText)
+                }
+            }
+            .navigationTitle("글로서리 추가")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("취소") { isPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
                     Button("추가") {
-                        let s = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let t = targetText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !s.isEmpty, !t.isEmpty else { return }
-                        onAdd(s, t)
+                        if !sourceText.isEmpty && !targetText.isEmpty {
+                            let entry = GlossaryStore.GlossaryEntry(
+                                source: sourceText,
+                                target: targetText
+                            )
+                            glossaryStore.entries.append(entry)
+                            glossaryStore.save()
+                        }
+                        isPresented = false
                     }
-                    .fontWeight(.semibold)
-                    .foregroundColor(canAdd ? .blue : .gray)
-                    .disabled(!canAdd)
+                    .disabled(sourceText.isEmpty || targetText.isEmpty)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-
-                Divider()
-
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("원어")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("원어", text: $sourceText)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 16))
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("번역/설명")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("번역 또는 설명 입력", text: $targetText)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 16))
-                    }
-                }
-                .padding(20)
-
-                Spacer()
+            }
+            .onAppear {
+                sourceText = word
             }
         }
-        .onAppear {
-            sourceText = word
-        }
-    }
-
-    private var canAdd: Bool {
-        !sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !targetText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

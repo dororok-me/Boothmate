@@ -33,6 +33,8 @@ struct ContentView: View {
     @State private var marqueeOffset: CGFloat = 0
     @State private var showRightPanel = true
     @State private var boothRefresh = false
+    @State private var showPaywall = false
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -75,6 +77,99 @@ struct ContentView: View {
     }
 
     var body: some View {
+        Group {
+            if verticalSizeClass == .regular && horizontalSizeClass == .compact {
+                // 세로 모드 (iPhone portrait) → 새 세로 레이아웃
+                VerticalContentView(
+                    speechManager: speechManager,
+                    glossaryStore: glossaryStore,
+                    gmStore: gmStore,
+                    subscriptionManager: subscriptionManager
+                )
+            } else {
+                // 가로 모드 (landscape / iPad) → 기존 레이아웃
+                landscapeBody
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { dismissKeyboard() }
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(speechManager: speechManager)
+        }
+        .sheet(isPresented: $showGlossary) {
+            GlossaryView(glossaryStore: glossaryStore)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+                .interactiveDismissDisabled(!subscriptionManager.canUseApp)
+        }
+        .onAppear {
+            speechManager.glossaryStore = glossaryStore
+            speechManager.currencyConverter = currencyConverter
+            sendBoothChangedNotification()
+            
+            // 구독 상태 확인
+            subscriptionManager.updateTrialStatus()
+            
+            // 테스트: 강제로 페이월 띄우기
+            if !subscriptionManager.canUseApp {
+                showPaywall = true
+            }
+            
+            Task {
+                await subscriptionManager.checkSubscriptionStatus()
+                if !subscriptionManager.canUseApp {
+                    showPaywall = true
+                }
+            }
+            
+            DispatchQueue.global(qos: .utility).async {
+                SFSpeechRecognizer.requestAuthorization { _ in }
+                AVAudioApplication.requestRecordPermission { _ in }
+                Task { @MainActor in
+                    currencyConverter.fetchRates()
+                }
+            }
+        }
+        .alert("언어 변경", isPresented: $showLanguageAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("녹음을 정지한 후 언어를 변경해 주세요")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dicTabChanged)) { notification in
+            guard let boothLanguage = notification.object as? String else { return }
+            switch boothLanguage {
+            case "ja-JP":
+                speechManager.selectedBooth = .jp
+                speechManager.selectedLanguage = BoothMode.jp.defaultLanguage
+                speechManager.objectWillChange.send()
+                sendBoothChangedNotification()
+            case "zh-CN":
+                speechManager.selectedBooth = .cn
+                speechManager.selectedLanguage = BoothMode.cn.defaultLanguage
+                speechManager.objectWillChange.send()
+                sendBoothChangedNotification()
+            default:
+                speechManager.selectedBooth = .kr
+                speechManager.selectedLanguage = BoothMode.kr.defaultLanguage
+                speechManager.objectWillChange.send()
+                sendBoothChangedNotification()
+            }
+        }
+        .alert("Booth 변경", isPresented: $showBoothAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("녹음을 정지한 후 Booth를 변경해 주세요")
+        }
+    }
+
+    // MARK: - Landscape Body
+
+    private var landscapeBody: some View {
         GeometryReader { geo in
             let totalWidth = geo.size.width
             let totalHeight = geo.size.height
@@ -115,60 +210,6 @@ struct ContentView: View {
             .frame(width: totalWidth, height: totalHeight)
         }
         .ignoresSafeArea()
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { dismissKeyboard() }
-            }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(speechManager: speechManager)
-        }
-        .sheet(isPresented: $showGlossary) {
-            GlossaryView(glossaryStore: glossaryStore)
-        }
-        .onAppear {
-            speechManager.glossaryStore = glossaryStore
-            speechManager.currencyConverter = currencyConverter
-            sendBoothChangedNotification()
-            DispatchQueue.global(qos: .utility).async {
-                SFSpeechRecognizer.requestAuthorization { _ in }
-                AVAudioApplication.requestRecordPermission { _ in }
-                Task { @MainActor in
-                    currencyConverter.fetchRates()
-                }
-            }
-        }
-        .alert("언어 변경", isPresented: $showLanguageAlert) {
-            Button("확인", role: .cancel) {}
-        } message: {
-            Text("녹음을 정지한 후 언어를 변경해 주세요")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .dicTabChanged)) { notification in
-            guard let boothLanguage = notification.object as? String else { return }
-            switch boothLanguage {
-            case "ja-JP":
-                speechManager.selectedBooth = .jp
-                speechManager.selectedLanguage = BoothMode.jp.defaultLanguage
-                speechManager.objectWillChange.send()
-                sendBoothChangedNotification()
-            case "zh-CN":
-                speechManager.selectedBooth = .cn
-                speechManager.selectedLanguage = BoothMode.cn.defaultLanguage
-                speechManager.objectWillChange.send()
-                sendBoothChangedNotification()
-            default:
-                speechManager.selectedBooth = .kr
-                speechManager.selectedLanguage = BoothMode.kr.defaultLanguage
-                speechManager.objectWillChange.send()
-                sendBoothChangedNotification()
-            }
-        }
-        .alert("Booth 변경", isPresented: $showBoothAlert) {
-            Button("확인", role: .cancel) {}
-        } message: {
-            Text("녹음을 정지한 후 Booth를 변경해 주세요")
-        }
     }
 
     // MARK: - Right Panel
@@ -379,8 +420,12 @@ struct ContentView: View {
                     speechManager.stopRecording()
                     marqueeOffset = 0
                 } else {
-                    speechManager.startRecording()
-                    startMarquee()
+                    if !subscriptionManager.canUseApp {
+                        showPaywall = true
+                    } else {
+                        speechManager.startRecording()
+                        startMarquee()
+                    }
                 }
             } label: {
                 if speechManager.isRecording {
@@ -496,15 +541,7 @@ struct ContentView: View {
                 }
             }
 
-            if verticalSizeClass == .regular && horizontalSizeClass == .compact {
-                Text("이 앱은\n가로 모드에\n최적화되어\n있습니다")
-                    .font(.system(size: 22, weight: .bold))
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.secondary.opacity(0.25))
-                    .rotationEffect(.degrees(90))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .allowsHitTesting(false)
-            }
+
         }
     }
 
@@ -559,22 +596,25 @@ struct ContentView: View {
 
 struct MemoPanel: View {
     @Binding var text: String
+    var hideHeader: Bool = false
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("메모").font(.system(size: 12, weight: .semibold)).foregroundColor(.gray)
-                Spacer()
-                Text("\(text.count)자").font(.system(size: 10)).foregroundColor(.gray.opacity(0.6))
-                if !text.isEmpty {
-                    Button { text = "" } label: {
-                        Image(systemName: "trash").font(.system(size: 12)).foregroundColor(.gray)
+            if !hideHeader {
+                HStack {
+                    Text("메모").font(.system(size: 12, weight: .semibold)).foregroundColor(.gray)
+                    Spacer()
+                    Text("\(text.count)자").font(.system(size: 10)).foregroundColor(.gray.opacity(0.6))
+                    if !text.isEmpty {
+                        Button { text = "" } label: {
+                            Image(systemName: "trash").font(.system(size: 12)).foregroundColor(.gray)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.gray.opacity(0.08))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.gray.opacity(0.08))
 
             TextEditor(text: $text)
                 .font(.system(size: 14))
