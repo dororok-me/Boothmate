@@ -466,13 +466,15 @@ struct VerticalContentView: View {
                 case .cn: dicLanguage = "zh-CN"
                 case .jp: dicLanguage = "ja-JP"
                 }
-                NotificationCenter.default.post(
-                    name: .searchDictionary,
-                    object: word,
-                    userInfo: ["language": dicLanguage]
-                )
-                gmStore.add(word: word)
                 selectedTab = .dictionary
+                gmStore.add(word: word)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    NotificationCenter.default.post(
+                        name: .searchDictionary,
+                        object: word,
+                        userInfo: ["language": dicLanguage]
+                    )
+                }
             }
         )
         .frame(maxWidth: .infinity, alignment: .leading)

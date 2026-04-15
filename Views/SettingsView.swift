@@ -142,7 +142,7 @@ struct SettingsView: View {
 
             if speechManager.glossaryEnabled {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("괄호 안 단어 색상")
+                    Text("Glossary color")
                         .font(.subheadline)
 
                     HStack(spacing: 12) {
@@ -211,14 +211,14 @@ struct SettingsView: View {
     }
 
     private var subscriptionSection: some View {
-        Section("구독") {
+        Section("Subscription") {
             Button {
                 showPaywall = true
             } label: {
                 HStack {
                     Image(systemName: "crown.fill")
                         .foregroundColor(.yellow)
-                    Text("Boothmate Pro 구독 관리")
+                    Text("Subscribe to Boothmate Pro")
                         .foregroundColor(.primary)
                 }
             }
