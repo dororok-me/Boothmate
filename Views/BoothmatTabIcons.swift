@@ -18,93 +18,88 @@ extension Color {
     }
 }
 
-// MARK: - 1. 사전 아이콘 (2단 사전 + 책갈피 + 점선)
+// MARK: - 1. 사전 아이콘 (심플 책 스타일)
 struct DictionaryTabIcon: View {
     var isSelected: Bool
-    var iconSize: CGFloat = 22
-    private var sc: CGFloat { iconSize / 72 }
+    var iconSize: CGFloat = 22   // 표시 높이 (pt)
+    private var sc: CGFloat { iconSize / 60 }
 
-    var cover:  Color { isSelected ? Color(hex:"#E67E22") : Color(hex:"#D0D0D0") }
-    var page:   Color { isSelected ? Color(hex:"#FFFDE7") : Color(hex:"#F2F2F2") }
-    var div:    Color { isSelected ? Color(hex:"#CA6F1E") : Color(hex:"#BBBBBB") }
-    var bm:     Color { isSelected ? Color(hex:"#C0392B") : Color(hex:"#BBBBBB") }
-    var lLines: [Color] { isSelected
-        ? [Color(hex:"#C0392B"), Color(hex:"#C0392B"), Color(hex:"#C0392B")]
-        : Array(repeating: Color(hex:"#C8C8C8"), count: 3) }
-    var rLines: [Color] { isSelected
-        ? [Color(hex:"#2980B9"), Color(hex:"#27AE60"), Color(hex:"#8E44AD")]
-        : Array(repeating: Color(hex:"#C8C8C8"), count: 3) }
-    var lDots: Color { isSelected ? Color(hex:"#E8A87C") : Color(hex:"#DDDDDD") }
-    var rDotColors: [Color] { isSelected
-        ? [Color(hex:"#7FB9D9"), Color(hex:"#7FC99A"), Color(hex:"#B89CCE")]
-        : Array(repeating: Color(hex:"#DDDDDD"), count: 3) }
-
-    let rowYs:  [CGFloat] = [16, 33, 50]   // 굵은 줄 Y
-    let dotYs:  [CGFloat] = [22, 39, 56]   // 점선 Y
-    let lWs:    [CGFloat] = [18, 14, 17]   // 왼쪽 줄 폭
-    let rWs:    [CGFloat] = [22, 18, 20]   // 오른쪽 줄 폭
-    let dotGap: CGFloat   = 6              // 점 간격
-    let dotW:   CGFloat   = 4             // 점 폭
-    let dotH:   CGFloat   = 2             // 점 높이
+    var spineColor: Color { isSelected ? Color(hex:"#A93226") : Color(hex:"#909090") }
+    var coverColor: Color { isSelected ? Color(hex:"#E67E22") : Color(hex:"#B0B0B0") }
+    var bandColor:  Color { isSelected ? Color(hex:"#EDE8DC") : Color(hex:"#D0D0D0") }
+    var bmColor:    Color { isSelected ? Color(hex:"#C0392B") : Color(hex:"#909090") }
+    var lineColors: [Color] { isSelected
+        ? [Color(hex:"#C0392B"), Color(hex:"#2980B9")]
+        : Array(repeating: Color(hex:"#909090"), count: 2) }
 
     var body: some View {
         Canvas { ctx, _ in
-            let c  = sc
-            let W  = 64 * c
-            let H  = 72 * c
-            let cr = 4  * c
+            let c = sc
 
-            // 클립
-            var clip = Path()
-            clip.move(to:    .init(x:cr,   y:0))
-            clip.addLine(to: .init(x:W-cr, y:0))
-            clip.addQuadCurve(to: .init(x:W,  y:cr),   control: .init(x:W, y:0))
-            clip.addLine(to: .init(x:W,    y:H-cr))
-            clip.addQuadCurve(to: .init(x:W-cr, y:H),  control: .init(x:W, y:H))
-            clip.addLine(to: .init(x:cr,   y:H))
-            clip.addQuadCurve(to: .init(x:0, y:H-cr),  control: .init(x:0, y:H))
-            clip.addLine(to: .init(x:0,    y:cr))
-            clip.addQuadCurve(to: .init(x:cr, y:0),    control: .init(x:0, y:0))
-            clip.closeSubpath()
-            ctx.clip(to: clip)
+            // 척추
+            ctx.fill(Path(roundedRect: .init(x:0, y:0, width:10*c, height:60*c), cornerRadius:5*c),
+                     with: .color(spineColor))
 
             // 표지
-            ctx.fill(Path(.init(x:0, y:0, width:W, height:H)), with:.color(cover))
-            // 내지
-            ctx.fill(Path(roundedRect: .init(x:4*c, y:6*c, width:56*c, height:60*c), cornerRadius:2*c), with:.color(page))
-            // 중앙 분리선
-            ctx.fill(Path(.init(x:30*c, y:6*c, width:1.5*c, height:60*c)), with:.color(div))
+            ctx.fill(Path(roundedRect: .init(x:8*c, y:0, width:44*c, height:50*c), cornerRadius:6*c),
+                     with: .color(coverColor))
+
+            // 하단 띠
+            ctx.fill(Path(roundedRect: .init(x:8*c, y:48*c, width:44*c, height:12*c), cornerRadius:5*c),
+                     with: .color(bandColor))
 
             // 책갈피
-            var bmp = Path()
-            bmp.move(to:    .init(x:50*c, y:0))
-            bmp.addLine(to: .init(x:60*c, y:0))
-            bmp.addLine(to: .init(x:60*c, y:18*c))
-            bmp.addLine(to: .init(x:55*c, y:13*c))
-            bmp.addLine(to: .init(x:50*c, y:18*c))
-            bmp.closeSubpath()
-            ctx.fill(bmp, with:.color(bm))
+            var bm = Path()
+            bm.move(to:    .init(x:40*c, y:0))
+            bm.addLine(to: .init(x:50*c, y:0))
+            bm.addLine(to: .init(x:50*c, y:14*c))
+            bm.addLine(to: .init(x:45*c, y:9*c))
+            bm.addLine(to: .init(x:40*c, y:14*c))
+            bm.closeSubpath()
+            ctx.fill(bm, with: .color(bmColor))
 
-            for (i, ry) in rowYs.enumerated() {
-                // 왼쪽 굵은 줄
-                ctx.fill(Path(roundedRect: .init(x:7*c, y:ry*c, width:lWs[i]*c, height:3*c), cornerRadius:1.5*c), with:.color(lLines[i]))
-                // 오른쪽 굵은 줄
-                ctx.fill(Path(roundedRect: .init(x:33*c, y:ry*c, width:rWs[i]*c, height:3*c), cornerRadius:1.5*c), with:.color(rLines[i]))
-
-                // 왼쪽 점선 (3점)
-                let dy = dotYs[i] * c
-                for d in 0..<3 {
-                    let dx = (7 + CGFloat(d) * dotGap) * c
-                    ctx.fill(Path(roundedRect: .init(x:dx, y:dy, width:dotW*c, height:dotH*c), cornerRadius:1*c), with:.color(lDots))
-                }
-                // 오른쪽 점선 (4점)
-                for d in 0..<4 {
-                    let dx = (33 + CGFloat(d) * dotGap) * c
-                    ctx.fill(Path(roundedRect: .init(x:dx, y:dy, width:dotW*c, height:dotH*c), cornerRadius:1*c), with:.color(rDotColors[i]))
-                }
+            // 줄 2개 + 돋보기
+            let lineWs: [CGFloat] = [32, 24]
+            let lineYs: [CGFloat] = [12, 21]
+            for i in 0..<2 {
+                ctx.fill(Path(roundedRect: .init(x:14*c, y:lineYs[i]*c, width:lineWs[i]*c, height:4*c),
+                              cornerRadius:2*c),
+                         with: .color(lineColors[i]))
             }
+
+            // 돋보기 유리 채우기 (반투명)
+            let mgCx: CGFloat = 36*c, mgCy: CGFloat = 35*c, mgR: CGFloat = 8*c
+            var glassPath = Path()
+            glassPath.addEllipse(in: .init(x: mgCx-mgR, y: mgCy-mgR, width: mgR*2, height: mgR*2))
+            ctx.fill(glassPath, with: .color(isSelected ? Color.white.opacity(0.25) : Color.white.opacity(0.2)))
+
+            // 돋보기 테두리
+            var mg = Path()
+            mg.addEllipse(in: .init(x: mgCx-mgR, y: mgCy-mgR, width: mgR*2, height: mgR*2))
+            ctx.stroke(mg, with: .color(bmColor),
+                       style: StrokeStyle(lineWidth: 3.2*c, lineCap: .round))
+
+            // 하이라이트 선 (동그라미 안, 우측+0.5 위+1.5)
+            var hl = Path()
+            hl.move(to:    .init(x: 33*c, y: 31.5*c))
+            hl.addQuadCurve(to: .init(x: 37.5*c, y: 31*c),
+                            control: .init(x: 35*c, y: 30*c))
+            ctx.stroke(hl, with: .color(Color.white.opacity(0.9)),
+                       style: StrokeStyle(lineWidth: 1.8*c, lineCap: .round))
+
+            // 하이라이트 점 (아래+1.5 우측+0.5)
+            var dot = Path()
+            dot.addEllipse(in: .init(x: (39-1.2)*c, y: (33-1.2)*c, width: 2.4*c, height: 2.4*c))
+            ctx.fill(dot, with: .color(Color.white.opacity(0.9)))
+
+            // 손잡이
+            var handle = Path()
+            handle.move(to: .init(x: (mgCx + mgR*0.7), y: (mgCy + mgR*0.7)))
+            handle.addLine(to: .init(x: (mgCx + mgR*0.7 + 5*c), y: (mgCy + mgR*0.7 + 5*c)))
+            ctx.stroke(handle, with: .color(bmColor),
+                       style: StrokeStyle(lineWidth: 3.2*c, lineCap: .round))
         }
-        .frame(width: 64*sc, height: 72*sc)
+        .frame(width: 52*sc, height: 60*sc)
         .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }
@@ -322,3 +317,5 @@ struct GMTabIcon: View {
         return p
     }
 }
+
+

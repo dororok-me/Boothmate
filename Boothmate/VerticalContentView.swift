@@ -8,9 +8,6 @@ struct VerticalContentView: View {
     @ObservedObject var gmStore: GMStore
     @ObservedObject var subscriptionManager: SubscriptionManager
 
-    @State private var dicCurrentWord: String = ""
-    @State private var dicMeanings: [String] = []
-    @State private var dicSelectedDic: String = "eng"
 
     // 드래그 비율 상태
     @State private var topRatio: CGFloat = 0.58
@@ -326,10 +323,7 @@ struct VerticalContentView: View {
     @ViewBuilder
     private func landscapePanelContent(safeTop: CGFloat = 0) -> some View {
         switch selectedTab {
-        case .dictionary: DictionaryView(hideTabs: true,
-                                          currentWord: $dicCurrentWord,
-                                          meanings: $dicMeanings,
-                                          selectedDicCode: $dicSelectedDic)
+        case .dictionary: DictionaryView(hideTabs: true)
         case .file:       sharedFilePanel
         case .memo:       MemoPanel(text: $memoText, hideHeader: true)
         case .gm:         GMView(gmStore: gmStore, glossaryStore: glossaryStore, hideHeader: true, toolbarHeight: safeTop + 32)
@@ -608,10 +602,7 @@ struct VerticalContentView: View {
             Group {
                 switch selectedTab {
                 case .dictionary:
-                    DictionaryView(hideTabs: true,
-                                   currentWord: $dicCurrentWord,
-                                   meanings: $dicMeanings,
-                                   selectedDicCode: $dicSelectedDic)
+                    DictionaryView(hideTabs: true)
                         .id("dictionary-panel")
                 case .file:
                     sharedFilePanel
