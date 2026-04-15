@@ -195,21 +195,52 @@ struct FilePreviewPanel: View {
 }
 
 // MARK: - QuickLook Preview
+// 싱글톤으로 QLPreviewController 인스턴스 유지 → 탭 전환/가로세로 전환해도 페이지 유지
+
+class QLPreviewStore: NSObject, QLPreviewControllerDataSource {
+    static let shared = QLPreviewStore()
+    var url: URL?
+    lazy var controller: QLPreviewController = {
+        let c = QLPreviewController()
+        c.dataSource = self
+        return c
+    }()
+    func numberOfPreviewItems(in controller: QLPreviewController) -> Int { url == nil ? 0 : 1 }
+    func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        url! as QLPreviewItem
+    }
+}
 
 struct QuickLookPreview: UIViewControllerRepresentable {
     let url: URL
-    func makeUIViewController(context: Context) -> QLPreviewController {
-        let c = QLPreviewController(); c.dataSource = context.coordinator; return c
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let store = QLPreviewStore.shared
+        if store.url != url {
+            store.url = url
+            store.controller.reloadData()
+        }
+        let container = UIViewController()
+        let child = store.controller
+        container.addChild(child)
+        container.view.addSubview(child.view)
+        child.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            child.view.topAnchor.constraint(equalTo: container.view.topAnchor),
+            child.view.bottomAnchor.constraint(equalTo: container.view.bottomAnchor),
+            child.view.leadingAnchor.constraint(equalTo: container.view.leadingAnchor),
+            child.view.trailingAnchor.constraint(equalTo: container.view.trailingAnchor)
+        ])
+        child.didMove(toParent: container)
+        return container
     }
-    func updateUIViewController(_ c: QLPreviewController, context: Context) {
-        context.coordinator.url = url; c.reloadData()
-    }
-    func makeCoordinator() -> Coordinator { Coordinator(url: url) }
-    class Coordinator: NSObject, QLPreviewControllerDataSource {
-        var url: URL
-        init(url: URL) { self.url = url }
-        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
-        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { url as QLPreviewItem }
+
+    func updateUIViewController(_ c: UIViewController, context: Context) {
+        let store = QLPreviewStore.shared
+        if store.url != url {
+            store.url = url
+            store.controller.reloadData()
+        }
     }
 }
 

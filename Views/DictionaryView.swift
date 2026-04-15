@@ -12,9 +12,11 @@ enum DictionaryMode: String, CaseIterable, Identifiable {
 struct DictionaryView: View {
     var hideTabs: Bool = false
 
-    @State private var selectedDic: DicTab = .eng
-    @State private var currentWord: String = ""
-    @State private var meanings: [String] = []
+    // ★ @State → @Binding (VerticalContentView가 상태 보존)
+    @Binding var currentWord: String
+    @Binding var meanings: [String]
+    @Binding var selectedDicCode: String  // "eng" / "jp" / "ch"
+
     @State private var isLoading: Bool = false
     @State private var isRecording: Bool = false
 
@@ -23,6 +25,14 @@ struct DictionaryView: View {
         case jp  = "Japanese"
         case ch  = "Chinese"
 
+        var code: String {
+            switch self {
+            case .eng: return "eng"
+            case .jp:  return "jp"
+            case .ch:  return "ch"
+            }
+        }
+
         var activeColor: Color {
             switch self {
             case .eng: return .blue
@@ -30,7 +40,17 @@ struct DictionaryView: View {
             case .ch:  return .red
             }
         }
+
+        static func from(code: String) -> DicTab {
+            switch code {
+            case "jp":  return .jp
+            case "ch":  return .ch
+            default:    return .eng
+            }
+        }
     }
+
+    private var selectedDic: DicTab { DicTab.from(code: selectedDicCode) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,7 +59,7 @@ struct DictionaryView: View {
                 HStack(spacing: 0) {
                     ForEach(DicTab.allCases, id: \.self) { tab in
                         Button {
-                            selectedDic = tab
+                            selectedDicCode = tab.code
                             if !currentWord.isEmpty {
                                 fetchMeaning(word: currentWord, tab: tab)
                             }
@@ -55,8 +75,8 @@ struct DictionaryView: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 7)
-                                .background(selectedDic == tab ? tab.activeColor : Color.clear)
-                                .foregroundColor(selectedDic == tab ? .white : .primary)
+                                .background(selectedDicCode == tab.code ? tab.activeColor : Color.clear)
+                                .foregroundColor(selectedDicCode == tab.code ? .white : .primary)
                         }
                         .disabled(isRecording)
                     }
@@ -80,7 +100,6 @@ struct DictionaryView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // 검색어
                         Text(currentWord)
                             .font(.system(size: 28, weight: .bold))
                             .padding(.horizontal, 16)
@@ -90,7 +109,6 @@ struct DictionaryView: View {
                         Divider()
                             .padding(.horizontal, 16)
 
-                        // 뜻 목록
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(Array(meanings.enumerated()), id: \.offset) { index, meaning in
                                 HStack(alignment: .top, spacing: 8) {
@@ -131,30 +149,30 @@ struct DictionaryView: View {
 
             if isKorean {
                 switch boothLanguage {
-                case "ja-JP": selectedDic = .jp
-                case "zh-CN": selectedDic = .ch
-                default:      selectedDic = .eng
+                case "ja-JP": selectedDicCode = "jp"
+                case "zh-CN": selectedDicCode = "ch"
+                default:      selectedDicCode = "eng"
                 }
             } else if isJapanese {
-                selectedDic = .jp
+                selectedDicCode = "jp"
             } else if isChinese && boothLanguage == "zh-CN" {
-                selectedDic = .ch
+                selectedDicCode = "ch"
             } else {
                 switch boothLanguage {
-                case "ja-JP": selectedDic = .jp
-                case "zh-CN": selectedDic = .ch
-                default:      selectedDic = .eng
+                case "ja-JP": selectedDicCode = "jp"
+                case "zh-CN": selectedDicCode = "ch"
+                default:      selectedDicCode = "eng"
                 }
             }
 
-            fetchMeaning(word: trimmed, tab: selectedDic)
+            fetchMeaning(word: trimmed, tab: DicTab.from(code: selectedDicCode))
         }
         .onReceive(NotificationCenter.default.publisher(for: .boothChanged)) { notification in
             guard let boothLanguage = notification.object as? String else { return }
             switch boothLanguage {
-            case "ja-JP": selectedDic = .jp
-            case "zh-CN": selectedDic = .ch
-            default:      selectedDic = .eng
+            case "ja-JP": selectedDicCode = "jp"
+            case "zh-CN": selectedDicCode = "ch"
+            default:      selectedDicCode = "eng"
             }
             currentWord = ""
             meanings = []
@@ -172,11 +190,9 @@ struct DictionaryView: View {
         }
     }
 
-    // MARK: - 뜻 가져오기
-
     private func fetchMeaning(word: String, tab: DicTab) {
         guard let encoded = word.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://small.dic.daum.net/search.do?q=\(encoded)&dic=\(tab.rawValue == "English" ? "eng" : tab.rawValue == "Japanese" ? "jp" : "ch")") else { return }
+              let url = URL(string: "https://small.dic.daum.net/search.do?q=\(encoded)&dic=\(tab.code)") else { return }
 
         isLoading = true
         meanings = []
@@ -187,9 +203,7 @@ struct DictionaryView: View {
                 DispatchQueue.main.async { isLoading = false }
                 return
             }
-
             let parsed = parseOgDescription(from: html)
-
             DispatchQueue.main.async {
                 meanings = parsed
                 isLoading = false
@@ -197,10 +211,7 @@ struct DictionaryView: View {
         }.resume()
     }
 
-    // MARK: - og:description 파싱
-
     private func parseOgDescription(from html: String) -> [String] {
-        // og:description 추출
         guard let ogRange = html.range(of: "og:description"),
               let contentStart = html.range(of: "content=\"", range: ogRange.upperBound..<html.endIndex),
               let contentEnd = html.range(of: "\"", range: contentStart.upperBound..<html.endIndex) else {
@@ -208,8 +219,6 @@ struct DictionaryView: View {
         }
 
         var raw = String(html[contentStart.upperBound..<contentEnd.lowerBound])
-
-        // HTML 엔티티 디코딩
         raw = raw.replacingOccurrences(of: "&hellip;", with: "…")
         raw = raw.replacingOccurrences(of: "&amp;", with: "&")
         raw = raw.replacingOccurrences(of: "&lt;", with: "<")
@@ -218,25 +227,18 @@ struct DictionaryView: View {
         raw = raw.replacingOccurrences(of: "&#39;", with: "'")
         raw = raw.replacingOccurrences(of: "&quot;", with: "\"")
 
-        // "1.뜻 2.뜻 3.뜻 " 형태에서 각 뜻 분리
-        // 숫자. 패턴으로 분리
         var results: [String] = []
         let pattern = #"\d+\.\s*(.+?)(?=\s*\d+\.|$)"#
         if let regex = try? NSRegularExpression(pattern: pattern) {
-            let nsString = raw as NSString
             let matches = regex.matches(in: raw, range: NSRange(raw.startIndex..., in: raw))
             for match in matches {
                 if match.numberOfRanges > 1,
                    let range = Range(match.range(at: 1), in: raw) {
                     let meaning = String(raw[range]).trimmingCharacters(in: .whitespaces)
-                    if !meaning.isEmpty {
-                        results.append(meaning)
-                    }
+                    if !meaning.isEmpty { results.append(meaning) }
                 }
             }
         }
-
         return results
     }
 }
-

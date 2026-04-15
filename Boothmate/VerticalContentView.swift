@@ -8,8 +8,9 @@ struct VerticalContentView: View {
     @ObservedObject var gmStore: GMStore
     @ObservedObject var subscriptionManager: SubscriptionManager
 
-    // ★ 가로↔세로 전환시 WebView 유지 (사전 연속성)
-    @State private var webViewModel = SharedWebViewModel()
+    @State private var dicCurrentWord: String = ""
+    @State private var dicMeanings: [String] = []
+    @State private var dicSelectedDic: String = "eng"
 
     // 드래그 비율 상태
     @State private var topRatio: CGFloat = 0.58
@@ -325,7 +326,10 @@ struct VerticalContentView: View {
     @ViewBuilder
     private func landscapePanelContent(safeTop: CGFloat = 0) -> some View {
         switch selectedTab {
-        case .dictionary: DictionaryView(hideTabs: true)
+        case .dictionary: DictionaryView(hideTabs: true,
+                                          currentWord: $dicCurrentWord,
+                                          meanings: $dicMeanings,
+                                          selectedDicCode: $dicSelectedDic)
         case .file:       sharedFilePanel
         case .memo:       MemoPanel(text: $memoText, hideHeader: true)
         case .gm:         GMView(gmStore: gmStore, glossaryStore: glossaryStore, hideHeader: true, toolbarHeight: safeTop + 32)
@@ -604,7 +608,11 @@ struct VerticalContentView: View {
             Group {
                 switch selectedTab {
                 case .dictionary:
-                    DictionaryView(hideTabs: true)
+                    DictionaryView(hideTabs: true,
+                                   currentWord: $dicCurrentWord,
+                                   meanings: $dicMeanings,
+                                   selectedDicCode: $dicSelectedDic)
+                        .id("dictionary-panel")
                 case .file:
                     sharedFilePanel
                 case .memo:
@@ -626,6 +634,7 @@ struct VerticalContentView: View {
             if let url = previewFileURL {
                 QuickLookPreview(url: url)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .id(url.absoluteString)
                 Button {
                     filePickerShown = true
                 } label: {
