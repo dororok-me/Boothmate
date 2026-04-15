@@ -139,7 +139,8 @@ class WarmupWebView: NSObject, WKNavigationDelegate {
         wv.navigationDelegate = self
         self.webView = wv
 
-        if let url = URL(string: "https://small.dic.daum.net/search.do?q=hello&dic=eng") {
+        if let url = URL(string: "https://dic.daum.net/search.do?q=hello&dic=eng&search_first=Y&lang=EN_KO") {
+
             wv.load(URLRequest(url: url))
         }
 

@@ -41,7 +41,7 @@ struct GlossaryView: View {
                 countSection
                 listSection
             }
-            .navigationTitle("글로서리")
+            .navigationTitle("Glossary")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

@@ -8,6 +8,9 @@ struct VerticalContentView: View {
     @ObservedObject var gmStore: GMStore
     @ObservedObject var subscriptionManager: SubscriptionManager
 
+    // ★ 가로↔세로 전환시 WebView 유지 (사전 연속성)
+    @State private var webViewModel = SharedWebViewModel()
+
     // 드래그 비율 상태
     @State private var topRatio: CGFloat = 0.58
     @State private var isDragging: Bool = false
@@ -24,7 +27,7 @@ struct VerticalContentView: View {
     // 하단 탭
     @State private var selectedTab: RightPanelTab = .dictionary
     @State private var memoText: String = ""
-    @State private var previewFileURL: URL? = nil
+    @State private var previewFileURL: URL? = nil  // ★ 파일 연속성 유지
     @State private var previewBookmarkData: Data? = nil
 
     // 알림 상태
@@ -102,6 +105,22 @@ struct VerticalContentView: View {
         }
     }
 
+    // MARK: - 화면 회전 헬퍼
+
+    private func rotateToLandscapeFullscreen() {
+        isFullscreen = true
+        AppDelegate.orientationLock = .landscape
+        UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
+        UINavigationController.attemptRotationToDeviceOrientation()
+    }
+
+    private func rotateToPortrait() {
+        isFullscreen = false
+        AppDelegate.orientationLock = .all
+        UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+        UINavigationController.attemptRotationToDeviceOrientation()
+    }
+
     // MARK: - 세로 레이아웃
 
     private var portraitLayout: some View {
@@ -176,9 +195,8 @@ struct VerticalContentView: View {
             let safeBottom = geo.safeAreaInsets.bottom
             let totalWidth = geo.size.width
             let totalHeight = geo.size.height
-            let handleWidth: CGFloat = 18
+            let handleWidth: CGFloat = 24
 
-            // 실제 콘텐츠 너비 (safeArea 제외한 순수 영역)
             let contentWidth = totalWidth
             let leftWidth = isFullscreen
                 ? contentWidth
@@ -191,8 +209,8 @@ struct VerticalContentView: View {
                     speechManager.selectedTheme.backgroundColor
                         .frame(width: leftWidth + safeLeading)
                     if !isFullscreen {
-                        Color(.systemGray5).frame(width: handleWidth)
-                        Color(.systemGray6)
+                        speechManager.selectedTheme.backgroundColor.frame(width: handleWidth)
+                        speechManager.selectedTheme.backgroundColor
                             .frame(width: rightWidth + safeTrailing)
                     }
                 }
@@ -200,25 +218,26 @@ struct VerticalContentView: View {
 
                 // 콘텐츠
                 HStack(spacing: 0) {
-                    // 좌측: 자막창 (safeLeading을 내부 패딩으로 전달)
                     subtitlePanel(leadingPadding: safeLeading)
                         .padding(.top, safeTop)
                         .frame(width: leftWidth + safeLeading, height: totalHeight)
 
                     if !isFullscreen {
-                        // 드래그 핸들
+                        // 가로 드래그 핸들
                         ZStack {
-                            Color(.systemGray5)
+                            speechManager.selectedTheme.backgroundColor
                             Rectangle()
-                                .fill(isLandscapeDragging ? Color(.systemGray2) : Color(.systemGray4))
-                                .frame(width: 1)
+                                .fill(isLandscapeDragging ? Color(.systemGray) : Color(.systemGray3))
+                                .frame(width: 2)
                             Image(systemName: "chevron.left.chevron.right")
-                                .font(.system(size: 9, weight: isLandscapeDragging ? .semibold : .light))
-                                .foregroundColor(isLandscapeDragging ? Color(.systemGray) : Color(.systemGray3))
-                                .background(Color(.systemGray5))
+                                .font(.system(size: 12, weight: isLandscapeDragging ? .bold : .regular))
+                                .foregroundColor(isLandscapeDragging ? Color(.systemGray) : Color(.systemGray2))
+                                .padding(.vertical, 10)
+                                .background(speechManager.selectedTheme.backgroundColor)
+                                .animation(.easeInOut(duration: 0.15), value: isLandscapeDragging)
                         }
                         .frame(width: handleWidth, height: totalHeight)
-                        .contentShape(Rectangle())
+                        .contentShape(Rectangle().inset(by: -16))
                         .gesture(
                             DragGesture(minimumDistance: 1, coordinateSpace: .global)
                                 .onChanged { value in
@@ -232,14 +251,21 @@ struct VerticalContentView: View {
                                 .onEnded { _ in isLandscapeDragging = false }
                         )
 
-                        // 우측: 탭 패널 (safeTrailing 포함)
+                        // 우측: 탭 패널
                         VStack(spacing: 0) {
-                            landscapeTabBar
-                            landscapePanelContent
+                            landscapePanelContent(safeTop: safeTop)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            HStack(spacing: 0) {
+                                landscapeTabBar(width: rightWidth)
+                                speechManager.selectedTheme.backgroundColor
+                                    .frame(width: safeTrailing)
+                            }
+                            .frame(height: 52)
                         }
-                        .padding(.bottom, safeBottom)
-                        .frame(width: rightWidth + safeTrailing, height: totalHeight)
-                        .background(Color(.systemGray6))
+                        .frame(width: rightWidth + safeTrailing)
+                        .frame(maxHeight: .infinity)
+                        .background(speechManager.selectedTheme.backgroundColor)
+                        .ignoresSafeArea(edges: .bottom)
                     }
                 }
                 .ignoresSafeArea()
@@ -271,34 +297,38 @@ struct VerticalContentView: View {
 
     // MARK: - 가로 탭바
 
-    private var landscapeTabBar: some View {
-        HStack(spacing: 0) {
+    private func landscapeTabBar(width: CGFloat) -> some View {
+        return HStack(spacing: 0) {
             ForEach([RightPanelTab.dictionary, .file, .memo, .gm], id: \.label) { tab in
                 Button {
                     selectedTab = tab
                 } label: {
                     VStack(spacing: 2) {
-                        Image(systemName: tab.icon).font(.system(size: 14))
-                        Text(tab.label).font(.system(size: 9))
+                        Spacer(minLength: 0)
+                        tabIcon(for: tab, isSelected: selectedTab == tab)
+                        Text(tab.label)
+                            .font(.system(size: 8, weight: selectedTab == tab ? .bold : .regular))
+                            .foregroundColor(selectedTab == tab ? tab.activeColor : .gray.opacity(0.6))
+                        Spacer(minLength: 0)
                     }
-                    .foregroundColor(selectedTab == tab ? .primary : .gray)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .buttonStyle(.plain)
             }
         }
+        .frame(width: width, height: 52)
         .background(Color(.systemBackground))
-        .overlay(Rectangle().frame(height: 0.5).foregroundColor(Color(.systemGray4)), alignment: .bottom)
+        .overlay(Rectangle().frame(height: 0.5).foregroundColor(Color(.systemGray4)), alignment: .top)
     }
 
+
     @ViewBuilder
-    private var landscapePanelContent: some View {
+    private func landscapePanelContent(safeTop: CGFloat = 0) -> some View {
         switch selectedTab {
         case .dictionary: DictionaryView(hideTabs: true)
-        case .file:       verticalFilePanel
+        case .file:       sharedFilePanel
         case .memo:       MemoPanel(text: $memoText, hideHeader: true)
-        case .gm:         GMView(gmStore: gmStore, glossaryStore: glossaryStore, hideHeader: true)
+        case .gm:         GMView(gmStore: gmStore, glossaryStore: glossaryStore, hideHeader: true, toolbarHeight: safeTop + 32)
         }
     }
 
@@ -307,26 +337,31 @@ struct VerticalContentView: View {
     private func subtitlePanel(leadingPadding: CGFloat = 0) -> some View {
         VStack(spacing: 0) {
 
-            // 상단 우측 툴바
             HStack {
                 Spacer()
 
-                // 전체화면 버튼 (가로모드일 때만)
-                if isLandscapeMode {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            isFullscreen.toggle()
+                // 1. 전체보기
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        if isLandscapeMode {
+                            if isFullscreen {
+                                rotateToPortrait()
+                            } else {
+                                isFullscreen = true
+                            }
+                        } else {
+                            rotateToLandscapeFullscreen()
                         }
-                    } label: {
-                        Image(systemName: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(isFullscreen ? .blue : speechManager.selectedTheme.iconColor)
-                            .frame(width: 28, height: 28)
                     }
-                    .buttonStyle(GlowButtonStyle())
+                } label: {
+                    Image(systemName: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(isFullscreen ? .blue : speechManager.selectedTheme.iconColor)
+                        .frame(width: 28, height: 28)
                 }
+                .buttonStyle(GlowButtonStyle())
 
-                // 일시정지
+                // 2. 자물쇠 (일시정지)
                 Button {
                     guard speechManager.isRecording else { return }
                     if speechManager.isPaused {
@@ -335,7 +370,7 @@ struct VerticalContentView: View {
                         speechManager.pauseRecording()
                     }
                 } label: {
-                    Image(systemName: "pause.circle")
+                    Image(systemName: speechManager.isPaused ? "lock.fill" : "lock.open")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(speechManager.isPaused ? Color.orange : speechManager.selectedTheme.iconColor)
                         .frame(width: 28, height: 28)
@@ -344,22 +379,7 @@ struct VerticalContentView: View {
                 .opacity(speechManager.isRecording ? 1.0 : 0.3)
                 .disabled(!speechManager.isRecording)
 
-                Button { showGlossarySheet = true } label: {
-                    Image(systemName: "pencil.and.list.clipboard")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(speechManager.selectedTheme.iconColor)
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(GlowButtonStyle())
-
-                Button { speechManager.clearSubtitles() } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(speechManager.selectedTheme.iconColor)
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(GlowButtonStyle())
-
+                // 3. 폰트 크기
                 Button { speechManager.cycleFontSize() } label: {
                     HStack(spacing: 1) {
                         Text("−").font(.system(size: 11, weight: .medium))
@@ -371,6 +391,25 @@ struct VerticalContentView: View {
                 }
                 .buttonStyle(GlowButtonStyle())
 
+                // 4. 글로서리
+                Button { showGlossarySheet = true } label: {
+                    Image(systemName: "pencil.and.list.clipboard")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(speechManager.selectedTheme.iconColor)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(GlowButtonStyle())
+
+                // 5. 쓰레기통
+                Button { speechManager.clearSubtitles() } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(speechManager.selectedTheme.iconColor)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(GlowButtonStyle())
+
+                // 6. 설정
                 Button { showSettingsSheet = true } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 13, weight: .semibold))
@@ -447,7 +486,6 @@ struct VerticalContentView: View {
 
     private var controlBar: some View {
         ZStack {
-            // 중앙: KR [▶] EN
             HStack(spacing: 4) {
                 languageButton(index: 0)
 
@@ -475,7 +513,6 @@ struct VerticalContentView: View {
                 languageButton(index: 1)
             }
 
-            // 우측: 타이머 (고정 위치)
             HStack {
                 Spacer()
                 Text(speechManager.isRecording ? String(format: "%02d:%02d",
@@ -522,7 +559,7 @@ struct VerticalContentView: View {
         ZStack {
             Circle().fill(Color.red.opacity(0.85)).frame(width: 36, height: 36)
             MarqueeText(text: "Boothmate transcribing")
-                .id(speechManager.isRecording) // isRecording 바뀔 때 뷰 재생성
+                .id(speechManager.isRecording)
         }
         .frame(width: 36, height: 36).clipShape(Circle())
     }
@@ -538,25 +575,22 @@ struct VerticalContentView: View {
         // MarqueeText가 자체적으로 애니메이션 처리
     }
 
-    // MARK: - 드래그 핸들
+    // MARK: - 세로 드래그 핸들
 
     private var dragHandle: some View {
         ZStack {
-            // 배경 (터치 영역 확보)
-            Color(.systemBackground)
+            speechManager.selectedTheme.backgroundColor
 
-            // 중앙 실선
             Rectangle()
-                .fill(isDragging ? Color(.systemGray2) : Color(.systemGray4))
-                .frame(height: 1)
+                .fill(isDragging ? Color(.systemGray) : Color(.systemGray3))
+                .frame(height: 2)
                 .animation(.easeInOut(duration: 0.15), value: isDragging)
 
-            // 화살표 아이콘 (실선 위에 배경색으로 끊어줌)
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 11, weight: isDragging ? .semibold : .light))
-                .foregroundColor(isDragging ? Color(.systemGray) : Color(.systemGray3))
+                .font(.system(size: 12, weight: isDragging ? .bold : .regular))
+                .foregroundColor(isDragging ? Color(.systemGray) : Color(.systemGray2))
                 .padding(.horizontal, 10)
-                .background(Color(.systemBackground))
+                .background(speechManager.selectedTheme.backgroundColor)
                 .animation(.easeInOut(duration: 0.15), value: isDragging)
         }
     }
@@ -572,7 +606,7 @@ struct VerticalContentView: View {
                 case .dictionary:
                     DictionaryView(hideTabs: true)
                 case .file:
-                    verticalFilePanel
+                    sharedFilePanel
                 case .memo:
                     MemoPanel(text: $memoText, hideHeader: true)
                 case .gm:
@@ -583,10 +617,11 @@ struct VerticalContentView: View {
 
             tabBar
         }
-        .background(Color(.systemGray6))
+        .background(speechManager.selectedTheme.backgroundColor)
     }
 
-    private var verticalFilePanel: some View {
+    // ★ 파일 패널 - previewFileURL이 VerticalContentView에 있어서 가로↔세로 유지됨
+    private var sharedFilePanel: some View {
         ZStack(alignment: .bottomLeading) {
             if let url = previewFileURL {
                 QuickLookPreview(url: url)
@@ -608,14 +643,7 @@ struct VerticalContentView: View {
                     Button {
                         filePickerShown = true
                     } label: {
-                        VStack(spacing: 8) {
-                            Image(systemName: "folder")
-                                .font(.system(size: 44))
-                                .foregroundColor(.gray.opacity(0.5))
-                            Text("파일 열기")
-                                .font(.system(size: 13))
-                                .foregroundColor(.gray)
-                        }
+                        FileTabIcon(isSelected: false, iconSize: 88)
                     }
                     .buttonStyle(.plain)
                 }
@@ -633,25 +661,39 @@ struct VerticalContentView: View {
                 Button {
                     selectedTab = tab
                 } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: selectedTab == tab ? tab.iconFilled : tab.icon)
-                            .font(.system(size: 15, weight: selectedTab == tab ? .bold : .regular))
-                            .foregroundColor(selectedTab == tab ? tab.activeColor : .gray.opacity(0.6))
+                    VStack(spacing: 2) {
+                        Spacer(minLength: 0)
+                        tabIcon(for: tab, isSelected: selectedTab == tab)
                         Text(tab.label)
                             .font(.system(size: 8, weight: selectedTab == tab ? .bold : .regular))
                             .foregroundColor(selectedTab == tab ? tab.activeColor : .gray.opacity(0.6))
+                        Spacer(minLength: 0)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .frame(height: 40)
+        .frame(height: 52)
         .background(Color(.systemBackground))
         .overlay(
             Rectangle().frame(height: 0.5).foregroundColor(Color(.systemGray4)),
             alignment: .top
         )
+    }
+
+    @ViewBuilder
+    private func tabIcon(for tab: RightPanelTab, isSelected: Bool) -> some View {
+        let on = isSelected
+        Group {
+            switch tab {
+            case .dictionary: DictionaryTabIcon(isSelected: on)
+            case .file:       FileTabIcon(isSelected: on)
+            case .memo:       MemoTabIcon(isSelected: on)
+            case .gm:         GMTabIcon(isSelected: on)
+            }
+        }
+        .frame(height: 22)
     }
 
     // MARK: - Helpers
@@ -672,11 +714,13 @@ struct VerticalContentView: View {
 struct MarqueeText: View {
     let text: String
     let fontSize: CGFloat = 6
-    @State private var offset: CGFloat = 18
+    @State private var offset: CGFloat = 0
     @State private var isRunning = false
+    @State private var timer: Timer? = nil
 
-    private var textWidth: CGFloat { CGFloat(text.count) * 5.5 + 12 }
-    private let duration: Double = 6.0
+    private var textWidth: CGFloat { CGFloat(text.count) * 4.2 + 16 }
+    private let speed: CGFloat = 28.0
+    private let fps: CGFloat = 1.0 / 60.0
 
     var body: some View {
         ZStack {
@@ -691,25 +735,26 @@ struct MarqueeText: View {
                 .fixedSize()
                 .offset(x: offset + textWidth)
         }
+        .clipped()
         .onAppear { startLoop() }
-        .onDisappear { isRunning = false }
+        .onDisappear { stopLoop() }
     }
 
     private func startLoop() {
+        guard !isRunning else { return }
         isRunning = true
-        offset = 18
-        animate()
+        offset = 0
+        timer = Timer.scheduledTimer(withTimeInterval: fps, repeats: true) { _ in
+            offset -= speed * fps
+            if offset <= -textWidth {
+                offset += textWidth
+            }
+        }
     }
 
-    private func animate() {
-        guard isRunning else { return }
-        withAnimation(.linear(duration: duration)) {
-            offset = 18 - textWidth
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-            guard isRunning else { return }
-            offset = 18
-            animate()
-        }
+    private func stopLoop() {
+        isRunning = false
+        timer?.invalidate()
+        timer = nil
     }
 }

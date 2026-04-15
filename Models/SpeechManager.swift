@@ -127,10 +127,7 @@ class SpeechManager: ObservableObject {
     
     @Published var scrollTrigger: Int = 0
 
-    // Font Weight
     @AppStorage("fontBold") var fontBold: Bool = false
-
-    // Azure STT
     @AppStorage("useAzure") var useAzure: Bool = false
     @AppStorage("azureApiKey") var azureApiKey: String = ""
     @AppStorage("azureRegion") var azureRegion: String = "koreacentral"
@@ -140,8 +137,6 @@ class SpeechManager: ObservableObject {
     var allSubtitles: [String] = []
     weak var glossaryStore: GlossaryStore?
     var currencyConverter: CurrencyConverter?
-    
-    
     
     // MARK: - Private Properties
     
@@ -155,13 +150,11 @@ class SpeechManager: ObservableObject {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine = AVAudioEngine()
     
-    // currentText throttle
     private var lastUpdateTime: Date = .distantPast
     
-    // Apple Speech 10분 리셋용
     private var sessionSeconds: Int = 0
     private var isRestarting = false
-    private let sessionLimit = 600  // 10분
+    private let sessionLimit = 600
     
     // MARK: - Languages
     
@@ -202,9 +195,6 @@ class SpeechManager: ObservableObject {
         return displayed
     }
     
-    // MARK: - 실시간 자막 업데이트 (throttle + 환산만 적용)
-    // 글로서리는 isFinal 확정 시에만 적용 (깜빡임 방지)
-
     private func updateCurrentText(_ rawText: String) {
         let now = Date()
         guard now.timeIntervalSince(lastUpdateTime) > 0.1 else { return }
@@ -240,46 +230,41 @@ class SpeechManager: ObservableObject {
         }
     }
     
-    // MARK: - Start Recording (Apple Speech)
+    // MARK: - Start Recording
     
     func startRecording() {
-        // UI 즉시 반응
         isRecording = true
 
-        // 1. 음성 인식 권한 확인
         guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
-            print("음성 인식 권한 없음 — 권한 요청 중")
             SFSpeechRecognizer.requestAuthorization { [weak self] status in
                 guard status == .authorized else {
-                    print("음성 인식 권한 거부됨")
                     Task { @MainActor in self?.isRecording = false }
                     return
                 }
-                Task { @MainActor in
-                    self?.requestMicAndBegin()
-                }
+                Task { @MainActor in self?.requestMicAndBegin() }
             }
             return
         }
-        // 2. 마이크 권한 확인 후 녹음 시작
         requestMicAndBegin()
     }
 
     private func requestMicAndBegin() {
-        AVAudioApplication.requestRecordPermission { [weak self] granted in
-            guard granted else {
-                print("마이크 권한 거부됨")
-                Task { @MainActor in self?.isRecording = false }
-                return
-            }
-            Task { @MainActor in
-                self?.beginRecording()
+        let status = AVAudioApplication.shared.recordPermission
+        if status == .granted {
+            beginRecording()
+        } else {
+            AVAudioApplication.requestRecordPermission { [weak self] granted in
+                guard granted else {
+                    Task { @MainActor in self?.isRecording = false }
+                    return
+                }
+                Task { @MainActor in self?.beginRecording() }
             }
         }
     }
 
     private func beginRecording() {
-        // 엔진 완전 초기화 (중복 탭 설치 방지)
+        // 엔진 완전 초기화
         if audioEngine.isRunning {
             audioEngine.stop()
         }
@@ -288,7 +273,6 @@ class SpeechManager: ObservableObject {
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
-            print("현재 선택된 언어의 음성 인식을 사용할 수 없습니다.")
             isRecording = false
             return
         }
@@ -306,11 +290,8 @@ class SpeechManager: ObservableObject {
             guard let recognitionRequest = recognitionRequest else { return }
             recognitionRequest.shouldReportPartialResults = true
 
+            // 새 엔진의 inputNode에 tap 설치 (removeTap 불필요 — 새 엔진)
             let inputNode = audioEngine.inputNode
-            if audioEngine.isRunning {
-                audioEngine.stop()
-            }
-            inputNode.removeTap(onBus: 0)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
                 recognitionRequest.append(buffer)
             }
@@ -346,10 +327,8 @@ class SpeechManager: ObservableObject {
                             self.updateCurrentText(rawText)
                         }
                     }
-                    if let error = error {
-                        if !self.isRestarting {
-                            print("음성 인식 오류: \(error.localizedDescription)")
-                        }
+                    if let error = error, !self.isRestarting {
+                        print("음성 인식 오류: \(error.localizedDescription)")
                     }
                 }
             }
@@ -359,7 +338,7 @@ class SpeechManager: ObservableObject {
         }
     }
     
-    // MARK: - 10분 리셋 (매끄러운 전환)
+    // MARK: - 10분 리셋
     
     private func restartRecognition() {
         guard !isRestarting else { return }
@@ -390,14 +369,13 @@ class SpeechManager: ObservableObject {
                 self.sessionSeconds = 0
                 self.isRestarting = false
                 self.startRecognitionOnly()
-                print("🔄 음성인식 세션 리스타트 (\(self.elapsedSeconds)초)")
             } else {
                 self.isRestarting = false
             }
         }
     }
     
-    // MARK: - 리셋 시 인식만 재시작 (타이머/UI 유지)
+    // MARK: - 리셋 시 인식만 재시작
     
     private func startRecognitionOnly() {
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: selectedLanguage))
@@ -416,14 +394,10 @@ class SpeechManager: ObservableObject {
             guard let recognitionRequest = recognitionRequest else { return }
             recognitionRequest.shouldReportPartialResults = true
 
-            // 기존 엔진 완전 정리 후 새 엔진 생성
-            if audioEngine.isRunning {
-                audioEngine.stop()
-            }
+            if audioEngine.isRunning { audioEngine.stop() }
             audioEngine.inputNode.removeTap(onBus: 0)
             audioEngine = AVAudioEngine()
 
-            // 새 엔진의 inputNode에 tap 설치
             let newInputNode = audioEngine.inputNode
             newInputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
                 recognitionRequest.append(buffer)
@@ -443,10 +417,8 @@ class SpeechManager: ObservableObject {
                             self.updateCurrentText(rawText)
                         }
                     }
-                    if let error = error {
-                        if !self.isRestarting {
-                            print("음성 인식 오류: \(error.localizedDescription)")
-                        }
+                    if let error = error, !self.isRestarting {
+                        print("음성 인식 오류: \(error.localizedDescription)")
                     }
                 }
             }
@@ -458,13 +430,8 @@ class SpeechManager: ObservableObject {
     
     // MARK: - Pause / Resume
     
-    func pauseRecording() {
-        isPaused = true
-    }
-    
-    func resumeRecording() {
-        isPaused = false
-    }
+    func pauseRecording() { isPaused = true }
+    func resumeRecording() { isPaused = false }
     
     // MARK: - Stop Recording
     
@@ -496,9 +463,7 @@ class SpeechManager: ObservableObject {
     
     // MARK: - Subtitles Management
     
-    func exportAllSubtitles() -> String {
-        return allSubtitles.joined(separator: "\n")
-    }
+    func exportAllSubtitles() -> String { allSubtitles.joined(separator: "\n") }
 
     func clearSubtitles() {
         subtitles.removeAll()
@@ -514,7 +479,6 @@ class SpeechManager: ObservableObject {
         guard !glossaryStore.entries.isEmpty else { return text }
 
         var output = text
-        // 긴 것부터 먼저 매칭
         let sortedEntries = glossaryStore.entries.sorted {
             max($0.source.count, $0.target.count) > max($1.source.count, $1.target.count)
         }
@@ -524,27 +488,20 @@ class SpeechManager: ObservableObject {
             let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !source.isEmpty, !target.isEmpty else { continue }
 
-            // 이미 어노테이션된 경우 스킵
             if output.localizedCaseInsensitiveContains("〔\(source)") ||
                output.localizedCaseInsensitiveContains("〔\(target)") { continue }
 
-            // 띄어쓰기 제거 버전
             let sourceNoSpace = source.replacingOccurrences(of: " ", with: "")
             let targetNoSpace = target.replacingOccurrences(of: " ", with: "")
 
-            // 텍스트에서 띄어쓰기 제거한 버전으로 검색하는 헬퍼
-            // "인공지능" 발화 → source "인공 지능" 으로 등록된 것과 매칭
             func findAndReplace(searchTerm: String, displayTerm: String, annotation: String) -> Bool {
                 let searchNoSpace = searchTerm.replacingOccurrences(of: " ", with: "")
-                // 이미 마커로 감싸진 경우 스킵
                 if output.localizedCaseInsensitiveContains("〔\(displayTerm)") { return false }
-                // 1. 원본 그대로 매칭
                 if output.localizedCaseInsensitiveContains(searchTerm) {
                     output = output.replacingOccurrences(of: searchTerm,
                         with: "〔\(displayTerm)(\(annotation))〕", options: .caseInsensitive)
                     return true
                 }
-                // 2. 띄어쓰기 없는 버전 매칭 → 등록된 원문(displayTerm)으로 교체
                 if searchNoSpace != searchTerm && output.localizedCaseInsensitiveContains(searchNoSpace) {
                     output = output.replacingOccurrences(of: searchNoSpace,
                         with: "〔\(displayTerm)(\(annotation))〕", options: .caseInsensitive)
@@ -553,18 +510,13 @@ class SpeechManager: ObservableObject {
                 return false
             }
 
-            // source 방향: 발화 → source(target)
             if findAndReplace(searchTerm: source, displayTerm: source, annotation: target) { continue }
-            // target 방향: 발화 → target(source)
             if findAndReplace(searchTerm: target, displayTerm: target, annotation: source) { continue }
-            // source 띄어쓰기 없는 버전: "인공지능" → "인공 지능(artificial intelligence)"
             if sourceNoSpace != source &&
                findAndReplace(searchTerm: sourceNoSpace, displayTerm: source, annotation: target) { continue }
-            // target 띄어쓰기 없는 버전
             if targetNoSpace != target &&
                findAndReplace(searchTerm: targetNoSpace, displayTerm: target, annotation: source) { continue }
 
-            // 유의어 매칭
             for synonym in entry.synonyms {
                 let syn = synonym.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !syn.isEmpty else { continue }

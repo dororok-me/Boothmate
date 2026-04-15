@@ -1,18 +1,24 @@
 import SwiftUI
 
+// MARK: - sheet(item:)용 Identifiable 래퍼
+
+struct SelectedWordItem: Identifiable {
+    let id = UUID()
+    let word: String
+}
+
 struct GMView: View {
     @ObservedObject var gmStore: GMStore
     @ObservedObject var glossaryStore: GlossaryStore
     var hideHeader: Bool = false
+    var toolbarHeight: CGFloat = 32
 
-    @State private var selectedWord: String = ""
-    @State private var showAddSheet = false
+    @State private var selectedItem: SelectedWordItem? = nil
     @State private var showDeleteAllAlert = false
 
     var body: some View {
         VStack(spacing: 0) {
 
-            // hideHeader가 false일 때만 헤더 표시
             if !hideHeader {
                 HStack {
                     Text("검색 기록")
@@ -47,59 +53,46 @@ struct GMView: View {
                 }
                 Spacer()
             } else {
-                // hideHeader일 때 쓰레기통을 리스트 위 우측에 배치
                 if hideHeader && !gmStore.entries.isEmpty {
                     HStack {
-                        Spacer()
                         Button {
                             showDeleteAllAlert = true
                         } label: {
                             Image(systemName: "trash")
-                                .font(.system(size: 12))
+                                .font(.system(size: 13))
                                 .foregroundColor(.red.opacity(0.6))
-                                .padding(8)
+                                .frame(width: 28, height: 28)
                         }
+                        .padding(.leading, 8)
+                        Spacer()
                     }
-                    .padding(.trailing, 4)
+                    .frame(height: toolbarHeight)
+                    .background(Color(.systemBackground))
+                    .overlay(
+                        Rectangle().frame(height: 0.5).foregroundColor(Color(.systemGray5)),
+                        alignment: .bottom
+                    )
                 }
 
-                List {
-                    ForEach(gmStore.entries) { entry in
-                        HStack(spacing: 8) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(entry.word)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.primary)
-                                Text(timeAgo(entry.addedAt))
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            if isInGlossary(entry.word) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(.green.opacity(0.7))
-                            } else {
-                                Button {
-                                    selectedWord = entry.word
-                                    DispatchQueue.main.async {
-                                        showAddSheet = true
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(gmStore.entries) { entry in
+                            GMEntryRow(
+                                entry: entry,
+                                isInGlossary: isInGlossary(entry.word),
+                                onAdd: {
+                                    selectedItem = SelectedWordItem(word: entry.word)
+                                },
+                                onDelete: {
+                                    if let idx = gmStore.entries.firstIndex(where: { $0.id == entry.id }) {
+                                        gmStore.delete(at: IndexSet(integer: idx))
                                     }
-                                } label: {
-                                    Image(systemName: "plus.circle")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(.blue)
                                 }
-                                .buttonStyle(.plain)
-                            }
+                            )
+                            Divider().padding(.leading, 12)
                         }
-                        .padding(.vertical, 2)
-                    }
-                    .onDelete { offsets in
-                        gmStore.delete(at: offsets)
                     }
                 }
-                .listStyle(.plain)
             }
         }
         .alert("기록 전체 삭제", isPresented: $showDeleteAllAlert) {
@@ -108,11 +101,11 @@ struct GMView: View {
         } message: {
             Text("검색 기록을 모두 삭제하시겠습니까?")
         }
-        .sheet(isPresented: $showAddSheet) {
+        .sheet(item: $selectedItem) { item in
             AddToGlossarySheet(
-                word: selectedWord,
+                word: item.word,
                 glossaryStore: glossaryStore,
-                isPresented: $showAddSheet
+                onDismiss: { selectedItem = nil }
             )
         }
     }
@@ -121,6 +114,49 @@ struct GMView: View {
         glossaryStore.entries.contains {
             $0.source.lowercased() == word.lowercased() ||
             $0.target.lowercased() == word.lowercased()
+        }
+    }
+}
+
+// MARK: - 개별 행
+
+struct GMEntryRow: View {
+    let entry: GMStore.GMEntry
+    let isInGlossary: Bool
+    let onAdd: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if isInGlossary {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.green.opacity(0.7))
+            } else {
+                Button(action: onAdd) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 18))
+                        .foregroundColor(.blue)
+                }
+                .buttonStyle(.borderless)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.word)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.primary)
+                Text(timeAgo(entry.addedAt))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive, action: onDelete) {
+                Label("삭제", systemImage: "trash")
+            }
         }
     }
 
@@ -138,10 +174,19 @@ struct GMView: View {
 struct AddToGlossarySheet: View {
     let word: String
     @ObservedObject var glossaryStore: GlossaryStore
-    @Binding var isPresented: Bool
+    let onDismiss: () -> Void
 
-    @State private var sourceText: String = ""
+    // State 없이 word를 직접 TextField에 바인딩
+    @State private var sourceText: String
     @State private var targetText: String = ""
+
+    init(word: String, glossaryStore: GlossaryStore, onDismiss: @escaping () -> Void) {
+        self.word = word
+        self.glossaryStore = glossaryStore
+        self.onDismiss = onDismiss
+        // _sourceText를 init에서 word로 초기화 — sheet(item:)이 매번 새 인스턴스를 만들어서 안전
+        self._sourceText = State(initialValue: word)
+    }
 
     var body: some View {
         NavigationView {
@@ -157,25 +202,23 @@ struct AddToGlossarySheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("취소") { isPresented = false }
+                    Button("취소") { onDismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("추가") {
                         if !sourceText.isEmpty && !targetText.isEmpty {
-                            let entry = GlossaryStore.GlossaryEntry(
-                                source: sourceText,
-                                target: targetText
+                            glossaryStore.entries.append(
+                                GlossaryStore.GlossaryEntry(
+                                    source: sourceText,
+                                    target: targetText
+                                )
                             )
-                            glossaryStore.entries.append(entry)
                             glossaryStore.save()
                         }
-                        isPresented = false
+                        onDismiss()
                     }
                     .disabled(sourceText.isEmpty || targetText.isEmpty)
                 }
-            }
-            .onAppear {
-                sourceText = word
             }
         }
     }

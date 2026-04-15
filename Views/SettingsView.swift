@@ -4,8 +4,10 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @ObservedObject var speechManager: SpeechManager
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     @State private var showGlossaryList = false
+    @State private var showPaywall = false
 
     var body: some View {
         NavigationView {
@@ -14,8 +16,8 @@ struct SettingsView: View {
                 fontSection
                 themeSection
                 glossarySection
-                //azureSection
                 exportSection
+                subscriptionSection
                 aboutSection
             }
             .navigationTitle("Settings")
@@ -52,13 +54,6 @@ struct SettingsView: View {
                 case .jp: boothLanguage = "ja-JP"
                 }
                 NotificationCenter.default.post(name: .boothChanged, object: boothLanguage)
-            }
-
-            HStack {
-                Text("Recognition Language")
-                Spacer()
-                Text(displayLanguageName(for: speechManager.selectedBooth.defaultLanguage))
-                    .foregroundColor(.secondary)
             }
         }
     }
@@ -133,15 +128,15 @@ struct SettingsView: View {
 
     private var glossarySection: some View {
         Section("Glossary") {
-            Toggle("글로서리 적용", isOn: $speechManager.glossaryEnabled)
-            Toggle("도량형 자동 환산", isOn: $speechManager.unitConversionEnabled)
+            Toggle("Glossary On/Off", isOn: $speechManager.glossaryEnabled)
+            Toggle("Unit Conversion On/Off", isOn: $speechManager.unitConversionEnabled)
 
             Button {
                 showGlossaryList = true
             } label: {
                 HStack {
                     Image(systemName: "text.book.closed")
-                    Text("글로서리 편집")
+                    Text("Edit Glossary")
                 }
             }
 
@@ -159,7 +154,7 @@ struct SettingsView: View {
                                     Circle()
                                         .fill(color.color)
                                         .frame(width: 32, height: 32)
-                                    
+
                                     if speechManager.glossaryColor == color {
                                         Circle()
                                             .stroke(Color.primary, lineWidth: 2.5)
@@ -181,44 +176,15 @@ struct SettingsView: View {
         }
     }
 
-    private var azureSection: some View {
-            Section("Azure STT (고급)") {
-                Toggle("Azure 사용", isOn: $speechManager.useAzure)
-
-                if speechManager.useAzure {
-                    HStack {
-                        Text("API Key")
-                        Spacer()
-                        SecureField("API Key 입력", text: $speechManager.azureApiKey)
-                            .multilineTextAlignment(.trailing)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                    }
-
-                    HStack {
-                        Text("Region")
-                        Spacer()
-                        TextField("예: koreacentral", text: $speechManager.azureRegion)
-                            .multilineTextAlignment(.trailing)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                    }
-
-                    Text("Azure Portal에서 Speech 리소스의 키와 지역을 입력하세요")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-
     private var exportSection: some View {
-            Section("자막 내보내기") {
+        Section("Export Subtitles") {
+            if subscriptionManager.isSubscribed {
                 Button {
                     shareSubtitles()
                 } label: {
                     HStack {
                         Image(systemName: "square.and.arrow.up")
-                        Text("Copy Subtitles")
+                        Text("Export Subtitles")
                     }
                 }
                 .disabled(speechManager.allSubtitles.isEmpty)
@@ -226,9 +192,42 @@ struct SettingsView: View {
                 Text("총 \(speechManager.allSubtitles.count)줄 저장됨")
                     .font(.footnote)
                     .foregroundColor(.secondary)
+            } else {
+                HStack {
+                    Image(systemName: "lock.fill")
+                        .foregroundColor(.secondary)
+                    Text("Only for subscribers")
+                        .foregroundColor(.secondary)
+                }
+
+                Button {
+                    showPaywall = true
+                } label: {
+                    Text("Upgrade to Pro")
+                        .foregroundColor(.accentColor)
+                }
             }
         }
-    
+    }
+
+    private var subscriptionSection: some View {
+        Section("구독") {
+            Button {
+                showPaywall = true
+            } label: {
+                HStack {
+                    Image(systemName: "crown.fill")
+                        .foregroundColor(.yellow)
+                    Text("Boothmate Pro 구독 관리")
+                        .foregroundColor(.primary)
+                }
+            }
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+        }
+    }
+
     private var aboutSection: some View {
         Section {
             VStack(spacing: 4) {
