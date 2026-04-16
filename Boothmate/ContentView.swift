@@ -214,32 +214,44 @@ class QLPreviewStore: NSObject, QLPreviewControllerDataSource {
 struct QuickLookPreview: UIViewControllerRepresentable {
     let url: URL
 
-    func makeUIViewController(context: Context) -> UIViewController {
+    func makeUIViewController(context: Context) -> ContainerVC {
+        let container = ContainerVC()
+        return container
+    }
+
+    func updateUIViewController(_ container: ContainerVC, context: Context) {
         let store = QLPreviewStore.shared
         if store.url != url {
             store.url = url
             store.controller.reloadData()
         }
-        let container = UIViewController()
-        let child = store.controller
-        container.addChild(child)
-        container.view.addSubview(child.view)
-        child.view.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            child.view.topAnchor.constraint(equalTo: container.view.topAnchor),
-            child.view.bottomAnchor.constraint(equalTo: container.view.bottomAnchor),
-            child.view.leadingAnchor.constraint(equalTo: container.view.leadingAnchor),
-            child.view.trailingAnchor.constraint(equalTo: container.view.trailingAnchor)
-        ])
-        child.didMove(toParent: container)
-        return container
+        // 아직 추가 안 됐을 때만 addChild
+        if store.controller.parent == nil {
+            container.embedChild(store.controller)
+        } else if store.controller.parent != container {
+            // 다른 컨테이너에 붙어 있으면 이동
+            store.controller.willMove(toParent: nil)
+            store.controller.view.removeFromSuperview()
+            store.controller.removeFromParent()
+            container.embedChild(store.controller)
+        }
     }
 
-    func updateUIViewController(_ c: UIViewController, context: Context) {
-        let store = QLPreviewStore.shared
-        if store.url != url {
-            store.url = url
-            store.controller.reloadData()
+    class ContainerVC: UIViewController {
+        func embedChild(_ child: UIViewController) {
+            addChild(child)
+            child.view.frame = view.bounds
+            child.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            view.addSubview(child.view)
+            child.didMove(toParent: self)
+        }
+
+        override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+            super.viewWillTransition(to: size, with: coordinator)
+            coordinator.animate { [weak self] _ in
+                guard let self else { return }
+                self.children.first?.view.frame = CGRect(origin: .zero, size: size)
+            }
         }
     }
 }
@@ -281,3 +293,4 @@ struct GlowButtonStyle: ButtonStyle {
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
+
