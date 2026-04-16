@@ -99,102 +99,7 @@ struct MemoPanel: View {
     }
 }
 
-// MARK: - 파일 프리뷰 패널
-
-struct FilePreviewPanel: View {
-    @Binding var fileURL: URL?
-    @Binding var bookmarkData: Data?
-    @State private var showFilePicker = false
-    @State private var previewID = UUID()
-
-    var body: some View {
-        VStack(spacing: 0) {
-            fileHeader
-            fileContent
-        }
-        .sheet(isPresented: $showFilePicker) {
-            DocumentPicker { url in
-                if let bookmark = try? url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil) {
-                    bookmarkData = bookmark
-                }
-                fileURL = url
-                previewID = UUID()
-            }
-        }
-    }
-
-    private var fileHeader: some View {
-        HStack {
-            if let url = fileURL {
-                Image(systemName: iconForFile(url)).font(.system(size: 12)).foregroundColor(.blue)
-                Text(url.lastPathComponent).font(.system(size: 11)).foregroundColor(.primary).lineLimit(1).truncationMode(.middle)
-            }
-            Spacer()
-            Button { showFilePicker = true } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "folder").font(.system(size: 12))
-                    Text("파일 열기").font(.system(size: 11, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.blue)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.gray.opacity(0.08))
-    }
-
-    @ViewBuilder
-    private var fileContent: some View {
-        if let url = resolveFileURL() {
-            QuickLookPreview(url: url).id(previewID)
-        } else {
-            VStack {
-                Spacer()
-                Image(systemName: "doc.text").font(.system(size: 32)).foregroundColor(.gray.opacity(0.4)).padding(.bottom, 8)
-                Text("파일을 선택하세요").font(.system(size: 14)).foregroundColor(.gray)
-                Spacer()
-            }
-        }
-    }
-
-    private func resolveFileURL() -> URL? {
-        if let url = fileURL {
-            if url.startAccessingSecurityScopedResource() { return url }
-        }
-        if let data = bookmarkData {
-            var isStale = false
-            if let url = try? URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale) {
-                _ = url.startAccessingSecurityScopedResource()
-                if isStale {
-                    bookmarkData = try? url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
-                }
-                fileURL = url
-                return url
-            }
-        }
-        return nil
-    }
-
-    private func iconForFile(_ url: URL) -> String {
-        switch url.pathExtension.lowercased() {
-        case "pdf": return "doc.richtext"
-        case "doc", "docx": return "doc.text"
-        case "xls", "xlsx": return "tablecells"
-        case "ppt", "pptx": return "rectangle.stack"
-        case "txt", "rtf": return "doc.plaintext"
-        case "jpg", "jpeg", "png", "gif", "heic": return "photo"
-        case "csv": return "tablecells"
-        default: return "doc"
-        }
-    }
-}
-
-// MARK: - QuickLook Preview
+// MARK: - QuickLook Preview (단순화 - 즉시 반영)
 
 struct QuickLookPreview: UIViewControllerRepresentable {
     let url: URL
@@ -206,6 +111,7 @@ struct QuickLookPreview: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ controller: QLPreviewController, context: Context) {
+        // ★ 조건 없이 항상 reload - 즉시 반영
         context.coordinator.url = url
         controller.reloadData()
     }
@@ -231,21 +137,48 @@ struct QuickLookPreview: UIViewControllerRepresentable {
     }
 }
 
-// MARK: - Document Picker
+// MARK: - Document Picker (PPT, PDF, JPG, DOC, 모든 파일 타입 지원)
 
 struct DocumentPicker: UIViewControllerRepresentable {
     var onPick: (URL) -> Void
+    
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.pdf, .plainText, .rtf, .spreadsheet, .presentation, .image, .data])
-        picker.delegate = context.coordinator; picker.allowsMultipleSelection = false; return picker
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [
+            .pdf,           // PDF 파일
+            .jpeg,          // JPG/JPEG 이미지
+            .png,           // PNG 이미지
+            .image,         // 기타 이미지
+            .presentation,  // PPT 파일
+            .spreadsheet,   // Excel 파일
+            .plainText,     // 텍스트 파일
+            .rtf,           // RTF 파일
+            .data           // DOC 등 기타 문서
+        ])
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        return picker
     }
-    func updateUIViewController(_ c: UIDocumentPickerViewController, context: Context) {}
-    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+    
+    func updateUIViewController(_ picker: UIDocumentPickerViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPick: onPick)
+    }
+    
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         var onPick: (URL) -> Void
-        init(onPick: @escaping (URL) -> Void) { self.onPick = onPick }
-        func documentPicker(_ c: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            if let url = urls.first { _ = url.startAccessingSecurityScopedResource(); onPick(url) }
+        
+        init(onPick: @escaping (URL) -> Void) {
+            self.onPick = onPick
+        }
+        
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard let url = urls.first else { return }
+            
+            // 파일 접근 권한 획득
+            _ = url.startAccessingSecurityScopedResource()
+            
+            onPick(url)
         }
     }
 }

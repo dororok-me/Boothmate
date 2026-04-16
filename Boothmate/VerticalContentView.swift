@@ -8,7 +8,6 @@ struct VerticalContentView: View {
     @ObservedObject var gmStore: GMStore
     @ObservedObject var subscriptionManager: SubscriptionManager
 
-
     // 드래그 비율 상태
     @State private var topRatio: CGFloat = 0.58
     @State private var isDragging: Bool = false
@@ -25,8 +24,7 @@ struct VerticalContentView: View {
     // 하단 탭
     @State private var selectedTab: RightPanelTab = .dictionary
     @State private var memoText: String = ""
-    @State private var previewFileURL: URL? = nil  // ★ 파일 연속성 유지
-    @State private var previewBookmarkData: Data? = nil
+    @State private var previewFileURL: URL? = nil  // ★ 항상 nil로 시작 - 자동 로딩 없음
 
     // 알림 상태
     @State private var showLanguageAlert = false
@@ -318,7 +316,6 @@ struct VerticalContentView: View {
         .background(Color(.systemBackground))
         .overlay(Rectangle().frame(height: 0.5).foregroundColor(Color(.systemGray4)), alignment: .top)
     }
-
 
     @ViewBuilder
     private func landscapePanelContent(safeTop: CGFloat = 0) -> some View {
@@ -621,14 +618,13 @@ struct VerticalContentView: View {
         .background(speechManager.selectedTheme.backgroundColor)
     }
 
-    // ★ 파일 패널 - previewFileURL이 VerticalContentView에 있어서 가로↔세로 유지됨
+    // ★ 파일 패널 - 완전히 단순화 (자동 로딩 없음, 즉시 반영)
     private var sharedFilePanel: some View {
         ZStack(alignment: .bottomLeading) {
             if let url = previewFileURL {
                 QuickLookPreview(url: url)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id(url.absoluteString)
-                    .allowsHitTesting(false)
                 Button {
                     filePickerShown = true
                 } label: {
@@ -654,7 +650,10 @@ struct VerticalContentView: View {
             }
         }
         .sheet(isPresented: $filePickerShown) {
-            DocumentPicker { url in previewFileURL = url }
+            DocumentPicker { url in
+                // 즉시 반영
+                previewFileURL = url
+            }
         }
     }
 
