@@ -195,63 +195,38 @@ struct FilePreviewPanel: View {
 }
 
 // MARK: - QuickLook Preview
-// 싱글톤으로 QLPreviewController 인스턴스 유지 → 탭 전환/가로세로 전환해도 페이지 유지
-
-class QLPreviewStore: NSObject, QLPreviewControllerDataSource {
-    static let shared = QLPreviewStore()
-    var url: URL?
-    lazy var controller: QLPreviewController = {
-        let c = QLPreviewController()
-        c.dataSource = self
-        return c
-    }()
-    func numberOfPreviewItems(in controller: QLPreviewController) -> Int { url == nil ? 0 : 1 }
-    func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
-        url! as QLPreviewItem
-    }
-}
 
 struct QuickLookPreview: UIViewControllerRepresentable {
     let url: URL
-
-    func makeUIViewController(context: Context) -> ContainerVC {
-        let container = ContainerVC()
-        return container
+    
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+        return controller
     }
-
-    func updateUIViewController(_ container: ContainerVC, context: Context) {
-        let store = QLPreviewStore.shared
-        if store.url != url {
-            store.url = url
-            store.controller.reloadData()
-        }
-        // 아직 추가 안 됐을 때만 addChild
-        if store.controller.parent == nil {
-            container.embedChild(store.controller)
-        } else if store.controller.parent != container {
-            // 다른 컨테이너에 붙어 있으면 이동
-            store.controller.willMove(toParent: nil)
-            store.controller.view.removeFromSuperview()
-            store.controller.removeFromParent()
-            container.embedChild(store.controller)
-        }
+    
+    func updateUIViewController(_ controller: QLPreviewController, context: Context) {
+        context.coordinator.url = url
+        controller.reloadData()
     }
-
-    class ContainerVC: UIViewController {
-        func embedChild(_ child: UIViewController) {
-            addChild(child)
-            child.view.frame = view.bounds
-            child.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            view.addSubview(child.view)
-            child.didMove(toParent: self)
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(url: url)
+    }
+    
+    class Coordinator: NSObject, QLPreviewControllerDataSource {
+        var url: URL
+        
+        init(url: URL) {
+            self.url = url
         }
-
-        override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
-            super.viewWillTransition(to: size, with: coordinator)
-            coordinator.animate { [weak self] _ in
-                guard let self else { return }
-                self.children.first?.view.frame = CGRect(origin: .zero, size: size)
-            }
+        
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+            return 1
+        }
+        
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+            return url as QLPreviewItem
         }
     }
 }
@@ -293,4 +268,3 @@ struct GlowButtonStyle: ButtonStyle {
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
-

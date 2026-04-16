@@ -628,6 +628,7 @@ struct VerticalContentView: View {
                 QuickLookPreview(url: url)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id(url.absoluteString)
+                    .allowsHitTesting(false)
                 Button {
                     filePickerShown = true
                 } label: {
