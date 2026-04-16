@@ -29,10 +29,14 @@ struct SettingsView: View {
                     }
                 }
             }
+            // ✅ 모든 sheet를 여기 한 곳에 모음
             .sheet(isPresented: $showGlossaryList) {
                 if let store = speechManager.glossaryStore {
                     GlossaryView(glossaryStore: store)
                 }
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
             }
         }
     }
@@ -211,6 +215,7 @@ struct SettingsView: View {
     }
 
     private var subscriptionSection: some View {
+        // ✅ .sheet 제거됨 (NavigationView 레벨로 올림)
         Section("Subscription") {
             Button {
                 showPaywall = true
@@ -222,9 +227,6 @@ struct SettingsView: View {
                         .foregroundColor(.primary)
                 }
             }
-        }
-        .sheet(isPresented: $showPaywall) {
-            PaywallView()
         }
     }
 
