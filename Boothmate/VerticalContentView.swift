@@ -101,20 +101,28 @@ struct VerticalContentView: View {
         }
     }
 
-    // MARK: - 화면 회전 헬퍼 (크래시 방지 - 단순화)
+    // MARK: - 화면 회전 헬퍼
 
     private func rotateToLandscapeFullscreen() {
-        // ★ AppDelegate 의존성 제거 - 단순히 풀스크린 상태만 변경
-        withAnimation(.easeInOut(duration: 0.3)) {
-            isFullscreen = true
+        isFullscreen = true
+        
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+        let geometryPreferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: .landscapeRight)
+        scene.requestGeometryUpdate(geometryPreferences) { error in
+            print("Rotation error: \(error.localizedDescription)")
         }
+        UIViewController.attemptRotationToDeviceOrientation()
     }
 
     private func rotateToPortrait() {
-        // ★ AppDelegate 의존성 제거 - 단순히 풀스크린 해제만
-        withAnimation(.easeInOut(duration: 0.3)) {
-            isFullscreen = false
+        isFullscreen = false
+        
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+        let geometryPreferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: .portrait)
+        scene.requestGeometryUpdate(geometryPreferences) { error in
+            print("Rotation error: \(error.localizedDescription)")
         }
+        UIViewController.attemptRotationToDeviceOrientation()
     }
 
     // MARK: - 세로 레이아웃
@@ -338,12 +346,8 @@ struct VerticalContentView: View {
                 // 1. 전체보기
                 Button {
                     withAnimation(.easeInOut(duration: 0.25)) {
-                        if isLandscapeMode {
-                            if isFullscreen {
-                                rotateToPortrait()
-                            } else {
-                                isFullscreen = true
-                            }
+                        if isFullscreen {
+                            rotateToPortrait()
                         } else {
                             rotateToLandscapeFullscreen()
                         }
