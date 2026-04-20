@@ -1,6 +1,6 @@
 // BoothmatTabIcons.swift
 // Boothmate — 하단 탭바 아이콘 4종 (사전 / 파일 / 메모 / GM)
-// 사용법: ContentView의 TabView에 바로 붙여넣기
+// 업데이트: SVG 기반 커스텀 아이콘으로 교체
 
 import SwiftUI
 
@@ -18,304 +18,379 @@ extension Color {
     }
 }
 
-// MARK: - 1. 사전 아이콘 (심플 책 스타일)
+// MARK: - 1. 사전 아이콘 (SVG 기반 - stroke)
 struct DictionaryTabIcon: View {
     var isSelected: Bool
-    var iconSize: CGFloat = 22   // 표시 높이 (pt)
-    private var sc: CGFloat { iconSize / 60 }
-
-    var spineColor: Color { isSelected ? Color(hex:"#A93226") : Color(hex:"#909090") }
-    var coverColor: Color { isSelected ? Color(hex:"#E67E22") : Color(hex:"#B0B0B0") }
-    var bandColor:  Color { isSelected ? Color(hex:"#EDE8DC") : Color(hex:"#D0D0D0") }
-    var bmColor:    Color { isSelected ? Color(hex:"#C0392B") : Color(hex:"#909090") }
-    var lineColors: [Color] { isSelected
-        ? [Color(hex:"#C0392B"), Color(hex:"#2980B9")]
-        : Array(repeating: Color(hex:"#909090"), count: 2) }
-
+    var iconSize: CGFloat = 22
+    
     var body: some View {
-        Canvas { ctx, _ in
-            let c = sc
-
-            // 척추
-            ctx.fill(Path(roundedRect: .init(x:0, y:0, width:10*c, height:60*c), cornerRadius:5*c),
-                     with: .color(spineColor))
-
-            // 표지
-            ctx.fill(Path(roundedRect: .init(x:8*c, y:0, width:44*c, height:50*c), cornerRadius:6*c),
-                     with: .color(coverColor))
-
-            // 하단 띠
-            ctx.fill(Path(roundedRect: .init(x:8*c, y:48*c, width:44*c, height:12*c), cornerRadius:5*c),
-                     with: .color(bandColor))
-
-            // 책갈피
-            var bm = Path()
-            bm.move(to:    .init(x:40*c, y:0))
-            bm.addLine(to: .init(x:50*c, y:0))
-            bm.addLine(to: .init(x:50*c, y:14*c))
-            bm.addLine(to: .init(x:45*c, y:9*c))
-            bm.addLine(to: .init(x:40*c, y:14*c))
-            bm.closeSubpath()
-            ctx.fill(bm, with: .color(bmColor))
-
-            // 줄 2개 + 돋보기
-            let lineWs: [CGFloat] = [32, 24]
-            let lineYs: [CGFloat] = [12, 21]
-            for i in 0..<2 {
-                ctx.fill(Path(roundedRect: .init(x:14*c, y:lineYs[i]*c, width:lineWs[i]*c, height:4*c),
-                              cornerRadius:2*c),
-                         with: .color(lineColors[i]))
-            }
-
-            // 돋보기 유리 채우기 (반투명)
-            let mgCx: CGFloat = 36*c, mgCy: CGFloat = 35*c, mgR: CGFloat = 8*c
-            var glassPath = Path()
-            glassPath.addEllipse(in: .init(x: mgCx-mgR, y: mgCy-mgR, width: mgR*2, height: mgR*2))
-            ctx.fill(glassPath, with: .color(isSelected ? Color.white.opacity(0.25) : Color.white.opacity(0.2)))
-
-            // 돋보기 테두리
-            var mg = Path()
-            mg.addEllipse(in: .init(x: mgCx-mgR, y: mgCy-mgR, width: mgR*2, height: mgR*2))
-            ctx.stroke(mg, with: .color(bmColor),
-                       style: StrokeStyle(lineWidth: 3.2*c, lineCap: .round))
-
-            // 하이라이트 선 (동그라미 안, 우측+0.5 위+1.5)
-            var hl = Path()
-            hl.move(to:    .init(x: 33*c, y: 31.5*c))
-            hl.addQuadCurve(to: .init(x: 37.5*c, y: 31*c),
-                            control: .init(x: 35*c, y: 30*c))
-            ctx.stroke(hl, with: .color(Color.white.opacity(0.9)),
-                       style: StrokeStyle(lineWidth: 1.8*c, lineCap: .round))
-
-            // 하이라이트 점 (아래+1.5 우측+0.5)
-            var dot = Path()
-            dot.addEllipse(in: .init(x: (39-1.2)*c, y: (33-1.2)*c, width: 2.4*c, height: 2.4*c))
-            ctx.fill(dot, with: .color(Color.white.opacity(0.9)))
-
-            // 손잡이
-            var handle = Path()
-            handle.move(to: .init(x: (mgCx + mgR*0.7), y: (mgCy + mgR*0.7)))
-            handle.addLine(to: .init(x: (mgCx + mgR*0.7 + 5*c), y: (mgCy + mgR*0.7 + 5*c)))
-            ctx.stroke(handle, with: .color(bmColor),
-                       style: StrokeStyle(lineWidth: 3.2*c, lineCap: .round))
-        }
-        .frame(width: 52*sc, height: 60*sc)
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
+        CustomDictionaryIcon()
+            .stroke(isSelected ? Color(red: 0.2, green: 0.5, blue: 1.0) : .gray.opacity(0.6), lineWidth: 2.0)
+            .frame(width: iconSize, height: iconSize)
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }
 
-// MARK: - 2. 파일 아이콘 (파랑)
+// MARK: - 2. 파일 아이콘 (SVG 기반 - stroke)
 struct FileTabIcon: View {
     var isSelected: Bool
     var iconSize: CGFloat = 22
-    private var sc: CGFloat { iconSize / 72 }
-
-    var folderBack:  Color { isSelected ? Color(hex:"#1565C0") : Color(hex:"#AAAAAA") }
-    var folderTab:   Color { isSelected ? Color(hex:"#1976D2") : Color(hex:"#BBBBBB") }
-    var folderFront: Color { isSelected ? Color(hex:"#2196F3") : Color(hex:"#D0D0D0") }
-    var folderFold:  Color { isSelected ? Color(hex:"#1976D2") : Color(hex:"#C0C0C0") }
-    var paperColor:  Color { isSelected ? Color(hex:"#E3F2FD") : Color(hex:"#F0F0F0") }
-    var dogEar:      Color { isSelected ? Color(hex:"#90CAF9") : Color(hex:"#E0E0E0") }
-
+    
     var body: some View {
-        Canvas { ctx, _ in
-            let c = sc
-
-            // 클립: y=4~72 로 상단 여백 줄여서 전체 높이 활용
-            var clip = Path()
-            clip.move(to:    .init(x:2*c,  y:10*c))
-            clip.addQuadCurve(to: .init(x:6*c,  y:6*c),  control: .init(x:2*c,  y:6*c))
-            clip.addLine(to: .init(x:26*c, y:6*c))
-            clip.addQuadCurve(to: .init(x:29*c, y:8*c),  control: .init(x:28*c, y:6*c))
-            clip.addLine(to: .init(x:32*c, y:12*c))
-            clip.addLine(to: .init(x:58*c, y:12*c))
-            clip.addQuadCurve(to: .init(x:62*c, y:16*c), control: .init(x:62*c, y:12*c))
-            clip.addLine(to: .init(x:62*c, y:68*c))
-            clip.addQuadCurve(to: .init(x:58*c, y:72*c), control: .init(x:62*c, y:72*c))
-            clip.addLine(to: .init(x:6*c,  y:72*c))
-            clip.addQuadCurve(to: .init(x:2*c,  y:68*c), control: .init(x:2*c,  y:72*c))
-            clip.closeSubpath()
-            ctx.clip(to: clip)
-
-            ctx.fill(Path(.init(x:2*c,  y:6*c,  width:60*c, height:66*c)), with:.color(folderBack))
-
-            var tab = Path()
-            tab.move(to:    .init(x:2*c,  y:10*c))
-            tab.addQuadCurve(to: .init(x:6*c,  y:6*c),  control: .init(x:2*c,  y:6*c))
-            tab.addLine(to: .init(x:26*c, y:6*c))
-            tab.addQuadCurve(to: .init(x:29*c, y:8*c),  control: .init(x:28*c, y:6*c))
-            tab.addLine(to: .init(x:32*c, y:12*c))
-            tab.addLine(to: .init(x:2*c,  y:12*c))
-            tab.closeSubpath()
-            ctx.fill(tab, with:.color(folderTab))
-
-            ctx.fill(Path(.init(x:2*c, y:16*c, width:60*c, height:56*c)), with:.color(folderFront))
-            ctx.fill(Path(.init(x:2*c, y:16*c, width:60*c, height:3*c)),  with:.color(folderFold))
-            ctx.fill(Path(roundedRect: .init(x:12*c, y:24*c, width:40*c, height:40*c), cornerRadius:3*c), with:.color(paperColor))
-
-            var d1 = Path()
-            d1.move(to: .init(x:42*c, y:24*c))
-            d1.addLine(to: .init(x:52*c, y:34*c))
-            d1.addLine(to: .init(x:42*c, y:34*c))
-            d1.closeSubpath()
-            ctx.fill(d1, with:.color(dogEar))
-        }
-        .frame(width: 64*sc, height: 72*sc)
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
+        CustomFolderIcon()
+            .stroke(isSelected ? Color(red: 1.0, green: 0.5, blue: 0.2) : .gray.opacity(0.6), lineWidth: 2.0)
+            .frame(width: iconSize, height: iconSize)
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }
 
-// MARK: - 3. 메모 아이콘 (파스텔 그린)
+// MARK: - 3. 메모 아이콘 (SVG 기반 - stroke)
 struct MemoTabIcon: View {
     var isSelected: Bool
     var iconSize: CGFloat = 22
-    private var sc: CGFloat { iconSize / 72 }
-
-    var paperBg:    Color { isSelected ? Color(hex:"#C8EBD4") : Color(hex:"#EFEFEF") }
-    var foldShadow: Color { isSelected ? Color(hex:"#8FC49F") : Color(hex:"#C8C8C8") }
-    var foldFace:   Color { isSelected ? Color(hex:"#A8D5B5") : Color(hex:"#D8D8D8") }
-    var ringBar:    Color { isSelected ? Color(hex:"#B8E0C4") : Color(hex:"#D5D5D5") }
-    var ringHole:   Color { isSelected ? Color(hex:"#8FC49F") : Color(hex:"#C8C8C8") }
-    var lineColors: [Color] { isSelected
-        ? [Color(hex:"#6BAE82"), Color(hex:"#5BA070"), Color(hex:"#6BAE82"), Color(hex:"#5BA070")]
-        : Array(repeating: Color(hex:"#D0D0D0"), count: 4) }
-
-    let lineYs: [CGFloat] = [20, 30, 40, 50]
-    let lineWs: [CGFloat] = [40, 32, 40, 24]
-
+    
     var body: some View {
-        Canvas { ctx, _ in
-            let c  = sc
-            let W  = 60 * c
-            let H  = 72 * c
-            let cr = 4  * c
-            let fx = 44 * c
-            let fy = 58 * c
-
-            var clip = Path()
-            clip.move(to:    .init(x:cr,   y:0))
-            clip.addLine(to: .init(x:W-cr, y:0))
-            clip.addQuadCurve(to: .init(x:W, y:cr),   control: .init(x:W, y:0))
-            clip.addLine(to: .init(x:W,  y:fy))
-            clip.addLine(to: .init(x:fx, y:H))
-            clip.addLine(to: .init(x:cr, y:H))
-            clip.addQuadCurve(to: .init(x:0, y:H-cr), control: .init(x:0, y:H))
-            clip.addLine(to: .init(x:0, y:cr))
-            clip.addQuadCurve(to: .init(x:cr, y:0),   control: .init(x:0, y:0))
-            clip.closeSubpath()
-            ctx.clip(to: clip)
-
-            ctx.fill(Path(.init(x:0, y:0, width:W, height:H)), with:.color(paperBg))
-
-            var sh = Path()
-            sh.move(to: .init(x:fx,      y:H))
-            sh.addLine(to: .init(x:W,    y:fy))
-            sh.addLine(to: .init(x:W,    y:fy+2*c))
-            sh.addLine(to: .init(x:fx+2*c, y:H))
-            sh.closeSubpath()
-            ctx.fill(sh, with:.color(foldShadow))
-
-            var fold = Path()
-            fold.move(to: .init(x:fx, y:fy))
-            fold.addLine(to: .init(x:W,  y:fy))
-            fold.addLine(to: .init(x:fx, y:H))
-            fold.closeSubpath()
-            ctx.fill(fold, with:.color(foldFace))
-
-            ctx.fill(Path(.init(x:0, y:5*c, width:W, height:4*c)), with:.color(ringBar))
-
-            for x: CGFloat in [14, 30, 46] {
-                ctx.fill(Path(ellipseIn: .init(x:(x-3.5)*c, y:3.5*c, width:7*c, height:7*c)), with:.color(ringHole))
-            }
-            for i in 0..<4 {
-                ctx.fill(Path(roundedRect: .init(x:8*c, y:lineYs[i]*c, width:lineWs[i]*c, height:3*c), cornerRadius:1.5*c), with:.color(lineColors[i]))
-            }
-        }
-        .frame(width: 60*sc, height: 72*sc)
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
+        CustomMemoIcon()
+            .stroke(isSelected ? Color(red: 0.4, green: 0.75, blue: 0.4) : .gray.opacity(0.6), lineWidth: 2.0)
+            .frame(width: iconSize, height: iconSize)
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }
 
-// MARK: - 4. GM 아이콘 (퍼플 + 골드 별)
+// MARK: - 4. GM 아이콘 (SVG 기반 - stroke)
 struct GMTabIcon: View {
     var isSelected: Bool
     var iconSize: CGFloat = 22
-    private var sc: CGFloat { iconSize / 72 }
-
-    var spineDark:  Color { isSelected ? Color(hex:"#5C3D8F") : Color(hex:"#AAAAAA") }
-    var spineMain:  Color { isSelected ? Color(hex:"#7B52AB") : Color(hex:"#C0C0C0") }
-    var cover:      Color { isSelected ? Color(hex:"#9B72CF") : Color(hex:"#D0D0D0") }
-    var coverEdge:  Color { isSelected ? Color(hex:"#8860BC") : Color(hex:"#C8C8C8") }
-    var page:       Color { isSelected ? Color(hex:"#F0EAFF") : Color(hex:"#F4F4F4") }
-    var termColor:  Color { isSelected ? Color(hex:"#7B52AB") : Color(hex:"#D0D0D0") }
-    var starColors: [Color] { isSelected
-        ? [Color(hex:"#1565C0"), Color(hex:"#0288D1"), Color(hex:"#0097A7")]
-        : [Color(hex:"#CCCCCC"), Color(hex:"#D4D4D4"), Color(hex:"#C8C8C8")] }
-
-    // 줄 3개 (왼쪽만, 별 자리 확보)
-    let rows: [(y: CGFloat, w: CGFloat)] = [
-        (22, 22), (37, 18), (52, 20)
-    ]
-    // 별: 큰 별 하나 + 작은 별 둘 (우측 상단에 배치)
-    let stars: [(cx: CGFloat, cy: CGFloat, r: CGFloat)] = [
-        (48, 26, 10),   // 메인 큰 별
-        (56, 44, 6),    // 중간 별
-        (42, 55, 5),    // 작은 별
-    ]
-
+    
     var body: some View {
-        Canvas { ctx, _ in
-            let c  = sc
-            let H  = 72 * c
-            let cr = 6  * c
-
-            var clip = Path()
-            clip.move(to:    .init(x:2*c+cr,  y:0))
-            clip.addLine(to: .init(x:64*c-cr, y:0))
-            clip.addQuadCurve(to: .init(x:64*c, y:cr),   control: .init(x:64*c, y:0))
-            clip.addLine(to: .init(x:64*c,    y:H-cr))
-            clip.addQuadCurve(to: .init(x:64*c-cr, y:H), control: .init(x:64*c, y:H))
-            clip.addLine(to: .init(x:2*c+cr,  y:H))
-            clip.addQuadCurve(to: .init(x:2*c, y:H-cr),  control: .init(x:2*c, y:H))
-            clip.addLine(to: .init(x:2*c,     y:cr))
-            clip.addQuadCurve(to: .init(x:2*c+cr, y:0),  control: .init(x:2*c, y:0))
-            clip.closeSubpath()
-            ctx.clip(to: clip)
-
-            // 척추 · 표지
-            ctx.fill(Path(.init(x:2*c, y:0, width:4*c,  height:H)), with:.color(spineDark))
-            ctx.fill(Path(.init(x:2*c, y:0, width:5*c,  height:H)), with:.color(spineMain))
-            ctx.fill(Path(.init(x:7*c, y:0, width:57*c, height:H)), with:.color(cover))
-            ctx.fill(Path(.init(x:7*c, y:0, width:2*c,  height:H)), with:.color(coverEdge))
-            // 내지
-            ctx.fill(Path(roundedRect: .init(x:10*c, y:8*c, width:47*c, height:56*c), cornerRadius:3*c), with:.color(page))
-
-            // 텍스트 줄 (왼쪽 절반만)
-            for row in rows {
-                ctx.fill(Path(roundedRect: .init(x:13*c, y:row.y*c, width:row.w*c, height:3*c), cornerRadius:1.5*c), with:.color(termColor))
-            }
-
-            // 별 3개 — 크고 선명하게
-            for (i, s) in stars.enumerated() {
-                ctx.fill(starPath(cx:s.cx*c, cy:s.cy*c, r:s.r*c), with:.color(starColors[i]))
-            }
-        }
-        .frame(width: 64*sc, height: 72*sc)
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
-    }
-
-    private func starPath(cx: CGFloat, cy: CGFloat, r: CGFloat) -> Path {
-        var p = Path()
-        let inner = r * 0.38
-        for i in 0..<10 {
-            let angle = (CGFloat(i) * .pi / 5) - .pi / 2
-            let radius = i.isMultiple(of: 2) ? r : inner
-            let pt = CGPoint(x: cx + radius * cos(angle), y: cy + radius * sin(angle))
-            i == 0 ? p.move(to: pt) : p.addLine(to: pt)
-        }
-        p.closeSubpath()
-        return p
+        CustomGMIcon()
+            .stroke(isSelected ? Color(red: 0.8, green: 0.3, blue: 0.7) : .gray.opacity(0.6), lineWidth: 2.0)
+            .frame(width: iconSize, height: iconSize)
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }
 
+// MARK: - SVG Shape Definitions (원본 SVG 정확 변환)
 
+// Dictionary Icon Shape - 새로운 dictionary.svg 그대로
+struct CustomDictionaryIcon: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.size.width
+        let height = rect.size.height
+        let scaleX = width / 24.0
+        let scaleY = height / 24.0
+        
+        // Main book body (stroke path)
+        path.move(to: CGPoint(x: 4 * scaleX, y: 8 * scaleY))
+        path.addCurve(to: CGPoint(x: 4.87868 * scaleX, y: 2.87868 * scaleY),
+                     control1: CGPoint(x: 4 * scaleX, y: 5.17157 * scaleY),
+                     control2: CGPoint(x: 4 * scaleX, y: 3.75736 * scaleY))
+        path.addCurve(to: CGPoint(x: 10 * scaleX, y: 2 * scaleY),
+                     control1: CGPoint(x: 5.75736 * scaleX, y: 2 * scaleY),
+                     control2: CGPoint(x: 7.17157 * scaleX, y: 2 * scaleY))
+        path.addLine(to: CGPoint(x: 14 * scaleX, y: 2 * scaleY))
+        path.addCurve(to: CGPoint(x: 19.1213 * scaleX, y: 2.87868 * scaleY),
+                     control1: CGPoint(x: 16.8284 * scaleX, y: 2 * scaleY),
+                     control2: CGPoint(x: 18.2426 * scaleX, y: 2 * scaleY))
+        path.addCurve(to: CGPoint(x: 20 * scaleX, y: 8 * scaleY),
+                     control1: CGPoint(x: 20 * scaleX, y: 3.75736 * scaleY),
+                     control2: CGPoint(x: 20 * scaleX, y: 5.17157 * scaleY))
+        path.addLine(to: CGPoint(x: 20 * scaleX, y: 16 * scaleY))
+        path.addCurve(to: CGPoint(x: 19.1213 * scaleX, y: 21.1213 * scaleY),
+                     control1: CGPoint(x: 20 * scaleX, y: 18.8284 * scaleY),
+                     control2: CGPoint(x: 20 * scaleX, y: 20.2426 * scaleY))
+        path.addCurve(to: CGPoint(x: 14 * scaleX, y: 22 * scaleY),
+                     control1: CGPoint(x: 18.2426 * scaleX, y: 22 * scaleY),
+                     control2: CGPoint(x: 16.8284 * scaleX, y: 22 * scaleY))
+        path.addLine(to: CGPoint(x: 10 * scaleX, y: 22 * scaleY))
+        path.addCurve(to: CGPoint(x: 4.87868 * scaleX, y: 21.1213 * scaleY),
+                     control1: CGPoint(x: 7.17157 * scaleX, y: 22 * scaleY),
+                     control2: CGPoint(x: 5.75736 * scaleX, y: 22 * scaleY))
+        path.addCurve(to: CGPoint(x: 4 * scaleX, y: 16 * scaleY),
+                     control1: CGPoint(x: 4 * scaleX, y: 20.2426 * scaleY),
+                     control2: CGPoint(x: 4 * scaleX, y: 18.8284 * scaleY))
+        path.addLine(to: CGPoint(x: 4 * scaleX, y: 8 * scaleY))
+        path.closeSubpath()
+        
+        // Page fold line (opacity 0.5 in original)
+        path.move(to: CGPoint(x: 19.8978 * scaleX, y: 16 * scaleY))
+        path.addLine(to: CGPoint(x: 7.89778 * scaleX, y: 16 * scaleY))
+        path.addCurve(to: CGPoint(x: 6.12132 * scaleX, y: 16.1022 * scaleY),
+                     control1: CGPoint(x: 6.96781 * scaleX, y: 16 * scaleY),
+                     control2: CGPoint(x: 6.50282 * scaleX, y: 16 * scaleY))
+        path.addCurve(to: CGPoint(x: 4 * scaleX, y: 18.2235 * scaleY),
+                     control1: CGPoint(x: 5.08604 * scaleX, y: 16.3796 * scaleY),
+                     control2: CGPoint(x: 4.2774 * scaleX, y: 17.1883 * scaleY))
+        
+        // Header line (opacity 0.5 in original)
+        path.move(to: CGPoint(x: 8 * scaleX, y: 7 * scaleY))
+        path.addLine(to: CGPoint(x: 16 * scaleX, y: 7 * scaleY))
+        
+        // Text line (opacity 0.5 in original)
+        path.move(to: CGPoint(x: 8 * scaleX, y: 10.5 * scaleY))
+        path.addLine(to: CGPoint(x: 13 * scaleX, y: 10.5 * scaleY))
+        
+        return path
+    }
+}
+
+// Folder Icon Shape - 원본 folder.svg 그대로
+struct CustomFolderIcon: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.size.width
+        let height = rect.size.height
+        let scaleX = width / 24.0
+        let scaleY = height / 24.0
+        
+        // Folder main body (stroke 방식으로 변환)
+        path.move(to: CGPoint(x: 2 * scaleX, y: 6.94975 * scaleY))
+        path.addCurve(to: CGPoint(x: 2.06935 * scaleX, y: 5.25839 * scaleY),
+                     control1: CGPoint(x: 2 * scaleX, y: 6.06722 * scaleY),
+                     control2: CGPoint(x: 2 * scaleX, y: 5.62595 * scaleY))
+        path.addCurve(to: CGPoint(x: 5.25839 * scaleX, y: 2.06935 * scaleY),
+                     control1: CGPoint(x: 2.37464 * scaleX, y: 3.64031 * scaleY),
+                     control2: CGPoint(x: 3.64031 * scaleX, y: 2.37464 * scaleY))
+        path.addCurve(to: CGPoint(x: 6.94975 * scaleX, y: 2 * scaleY),
+                     control1: CGPoint(x: 5.62595 * scaleX, y: 2 * scaleY),
+                     control2: CGPoint(x: 6.06722 * scaleX, y: 2 * scaleY))
+        path.addCurve(to: CGPoint(x: 7.71557 * scaleX, y: 2.01738 * scaleY),
+                     control1: CGPoint(x: 7.33642 * scaleX, y: 2 * scaleY),
+                     control2: CGPoint(x: 7.52976 * scaleX, y: 2 * scaleY))
+        path.addCurve(to: CGPoint(x: 9.89594 * scaleX, y: 2.92051 * scaleY),
+                     control1: CGPoint(x: 8.51665 * scaleX, y: 2.09229 * scaleY),
+                     control2: CGPoint(x: 9.27652 * scaleX, y: 2.40704 * scaleY))
+        path.addCurve(to: CGPoint(x: 10.4497 * scaleX, y: 3.44975 * scaleY),
+                     control1: CGPoint(x: 10.0396 * scaleX, y: 3.03961 * scaleY),
+                     control2: CGPoint(x: 10.1763 * scaleX, y: 3.17633 * scaleY))
+        path.addLine(to: CGPoint(x: 11 * scaleX, y: 4 * scaleY))
+        path.addCurve(to: CGPoint(x: 12.7121 * scaleX, y: 5.49543 * scaleY),
+                     control1: CGPoint(x: 11.8158 * scaleX, y: 4.81578 * scaleY),
+                     control2: CGPoint(x: 12.2237 * scaleX, y: 5.22367 * scaleY))
+        path.addCurve(to: CGPoint(x: 13.5604 * scaleX, y: 5.84678 * scaleY),
+                     control1: CGPoint(x: 12.9804 * scaleX, y: 5.64471 * scaleY),
+                     control2: CGPoint(x: 13.2651 * scaleX, y: 5.7626 * scaleY))
+        path.addCurve(to: CGPoint(x: 15.8284 * scaleX, y: 6 * scaleY),
+                     control1: CGPoint(x: 14.0979 * scaleX, y: 6 * scaleY),
+                     control2: CGPoint(x: 14.6747 * scaleX, y: 6 * scaleY))
+        path.addLine(to: CGPoint(x: 16.2021 * scaleX, y: 6 * scaleY))
+        path.addCurve(to: CGPoint(x: 21.0062 * scaleX, y: 6.76946 * scaleY),
+                     control1: CGPoint(x: 18.8345 * scaleX, y: 6 * scaleY),
+                     control2: CGPoint(x: 20.1506 * scaleX, y: 6 * scaleY))
+        path.addCurve(to: CGPoint(x: 21.2305 * scaleX, y: 6.99383 * scaleY),
+                     control1: CGPoint(x: 21.0849 * scaleX, y: 6.84024 * scaleY),
+                     control2: CGPoint(x: 21.1598 * scaleX, y: 6.91514 * scaleY))
+        path.addCurve(to: CGPoint(x: 22 * scaleX, y: 11.7979 * scaleY),
+                     control1: CGPoint(x: 22 * scaleX, y: 7.84935 * scaleY),
+                     control2: CGPoint(x: 22 * scaleX, y: 9.16554 * scaleY))
+        path.addLine(to: CGPoint(x: 22 * scaleX, y: 14 * scaleY))
+        path.addCurve(to: CGPoint(x: 20.8284 * scaleX, y: 20.8284 * scaleY),
+                     control1: CGPoint(x: 22 * scaleX, y: 17.7712 * scaleY),
+                     control2: CGPoint(x: 22 * scaleX, y: 19.6569 * scaleY))
+        path.addCurve(to: CGPoint(x: 14 * scaleX, y: 22 * scaleY),
+                     control1: CGPoint(x: 19.6569 * scaleX, y: 22 * scaleY),
+                     control2: CGPoint(x: 17.7712 * scaleX, y: 22 * scaleY))
+        path.addLine(to: CGPoint(x: 10 * scaleX, y: 22 * scaleY))
+        path.addCurve(to: CGPoint(x: 3.17157 * scaleX, y: 20.8284 * scaleY),
+                     control1: CGPoint(x: 6.22876 * scaleX, y: 22 * scaleY),
+                     control2: CGPoint(x: 4.34315 * scaleX, y: 22 * scaleY))
+        path.addCurve(to: CGPoint(x: 2 * scaleX, y: 14 * scaleY),
+                     control1: CGPoint(x: 2 * scaleX, y: 19.6569 * scaleY),
+                     control2: CGPoint(x: 2 * scaleX, y: 17.7712 * scaleY))
+        path.addLine(to: CGPoint(x: 2 * scaleX, y: 6.94975 * scaleY))
+        path.closeSubpath()
+        
+        // Inner line (from original stroke path)
+        path.move(to: CGPoint(x: 18 * scaleX, y: 10 * scaleY))
+        path.addLine(to: CGPoint(x: 13 * scaleX, y: 10 * scaleY))
+        
+        return path
+    }
+}
+
+// Memo Icon Shape - 원본 memo.svg 그대로
+struct CustomMemoIcon: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.size.width
+        let height = rect.size.height
+        let scaleX = width / 24.0
+        let scaleY = height / 24.0
+        
+        // Main clipboard body
+        path.move(to: CGPoint(x: 20 * scaleX, y: 8.25 * scaleY))
+        path.addLine(to: CGPoint(x: 20 * scaleX, y: 18 * scaleY))
+        path.addCurve(to: CGPoint(x: 18.21 * scaleX, y: 22 * scaleY),
+                     control1: CGPoint(x: 20 * scaleX, y: 21 * scaleY),
+                     control2: CGPoint(x: 20 * scaleX, y: 22 * scaleY))
+        path.addLine(to: CGPoint(x: 16 * scaleX, y: 22 * scaleY))
+        path.addLine(to: CGPoint(x: 8 * scaleX, y: 22 * scaleY))
+        path.addCurve(to: CGPoint(x: 4 * scaleX, y: 18 * scaleY),
+                     control1: CGPoint(x: 5.79 * scaleX, y: 22 * scaleY),
+                     control2: CGPoint(x: 4 * scaleX, y: 21 * scaleY))
+        path.addLine(to: CGPoint(x: 4 * scaleX, y: 8.25 * scaleY))
+        path.addCurve(to: CGPoint(x: 8 * scaleX, y: 4.25 * scaleY),
+                     control1: CGPoint(x: 4 * scaleX, y: 5 * scaleY),
+                     control2: CGPoint(x: 5.79 * scaleX, y: 4.25 * scaleY))
+        path.addCurve(to: CGPoint(x: 8.65997 * scaleX, y: 5.84 * scaleY),
+                     control1: CGPoint(x: 8 * scaleX, y: 4.87 * scaleY),
+                     control2: CGPoint(x: 8.24997 * scaleX, y: 5.43 * scaleY))
+        path.addCurve(to: CGPoint(x: 10.25 * scaleX, y: 6.5 * scaleY),
+                     control1: CGPoint(x: 9.06997 * scaleX, y: 6.25 * scaleY),
+                     control2: CGPoint(x: 9.63 * scaleX, y: 6.5 * scaleY))
+        path.addLine(to: CGPoint(x: 13.75 * scaleX, y: 6.5 * scaleY))
+        path.addCurve(to: CGPoint(x: 16 * scaleX, y: 4.25 * scaleY),
+                     control1: CGPoint(x: 14.99 * scaleX, y: 6.5 * scaleY),
+                     control2: CGPoint(x: 16 * scaleX, y: 5.49 * scaleY))
+        path.addCurve(to: CGPoint(x: 20 * scaleX, y: 8.25 * scaleY),
+                     control1: CGPoint(x: 18.21 * scaleX, y: 4.25 * scaleY),
+                     control2: CGPoint(x: 20 * scaleX, y: 5 * scaleY))
+        path.closeSubpath()
+        
+        // Clip section
+        path.move(to: CGPoint(x: 16 * scaleX, y: 4.25 * scaleY))
+        path.addCurve(to: CGPoint(x: 15.34 * scaleX, y: 2.66 * scaleY),
+                     control1: CGPoint(x: 16 * scaleX, y: 3.63 * scaleY),
+                     control2: CGPoint(x: 15.75 * scaleX, y: 3.07 * scaleY))
+        path.addCurve(to: CGPoint(x: 13.75 * scaleX, y: 2 * scaleY),
+                     control1: CGPoint(x: 14.93 * scaleX, y: 2.25 * scaleY),
+                     control2: CGPoint(x: 14.37 * scaleX, y: 2 * scaleY))
+        path.addLine(to: CGPoint(x: 10.25 * scaleX, y: 2 * scaleY))
+        path.addCurve(to: CGPoint(x: 8 * scaleX, y: 4.25 * scaleY),
+                     control1: CGPoint(x: 9.01 * scaleX, y: 2 * scaleY),
+                     control2: CGPoint(x: 8 * scaleX, y: 3.01 * scaleY))
+        path.addCurve(to: CGPoint(x: 8.65997 * scaleX, y: 5.84 * scaleY),
+                     control1: CGPoint(x: 8 * scaleX, y: 4.87 * scaleY),
+                     control2: CGPoint(x: 8.24997 * scaleX, y: 5.43 * scaleY))
+        path.addCurve(to: CGPoint(x: 10.25 * scaleX, y: 6.5 * scaleY),
+                     control1: CGPoint(x: 9.06997 * scaleX, y: 6.25 * scaleY),
+                     control2: CGPoint(x: 9.63 * scaleX, y: 6.5 * scaleY))
+        path.addLine(to: CGPoint(x: 13.75 * scaleX, y: 6.5 * scaleY))
+        path.addCurve(to: CGPoint(x: 16 * scaleX, y: 4.25 * scaleY),
+                     control1: CGPoint(x: 14.99 * scaleX, y: 6.5 * scaleY),
+                     control2: CGPoint(x: 16 * scaleX, y: 5.49 * scaleY))
+        path.closeSubpath()
+        
+        // Lines (from original stroke paths)
+        path.move(to: CGPoint(x: 8 * scaleX, y: 13 * scaleY))
+        path.addLine(to: CGPoint(x: 12 * scaleX, y: 13 * scaleY))
+        
+        path.move(to: CGPoint(x: 8 * scaleX, y: 17 * scaleY))
+        path.addLine(to: CGPoint(x: 16 * scaleX, y: 17 * scaleY))
+        
+        return path
+    }
+}
+
+// GM Icon Shape - 원본 GM.svg 그대로
+struct CustomGMIcon: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.size.width
+        let height = rect.size.height
+        let scaleX = width / 24.0
+        let scaleY = height / 24.0
+        
+        // Calendar rings
+        path.move(to: CGPoint(x: 8 * scaleX, y: 2 * scaleY))
+        path.addLine(to: CGPoint(x: 8 * scaleX, y: 5 * scaleY))
+        
+        path.move(to: CGPoint(x: 16 * scaleX, y: 2 * scaleY))
+        path.addLine(to: CGPoint(x: 16 * scaleX, y: 5 * scaleY))
+        
+        // Calendar main body
+        path.move(to: CGPoint(x: 21 * scaleX, y: 8.5 * scaleY))
+        path.addLine(to: CGPoint(x: 21 * scaleX, y: 13.63 * scaleY))
+        path.addCurve(to: CGPoint(x: 20.11 * scaleX, y: 12.92 * scaleY),
+                     control1: CGPoint(x: 20.11 * scaleX, y: 12.92 * scaleY),
+                     control2: CGPoint(x: 20.11 * scaleX, y: 12.92 * scaleY))
+        path.addCurve(to: CGPoint(x: 17.75 * scaleX, y: 12.5 * scaleY),
+                     control1: CGPoint(x: 18.98 * scaleX, y: 12.5 * scaleY),
+                     control2: CGPoint(x: 18.98 * scaleX, y: 12.5 * scaleY))
+        path.addCurve(to: CGPoint(x: 14.47 * scaleX, y: 13.66 * scaleY),
+                     control1: CGPoint(x: 16.52 * scaleX, y: 12.5 * scaleY),
+                     control2: CGPoint(x: 15.37 * scaleX, y: 12.93 * scaleY))
+        path.addCurve(to: CGPoint(x: 12.5 * scaleX, y: 17.75 * scaleY),
+                     control1: CGPoint(x: 13.26 * scaleX, y: 14.61 * scaleY),
+                     control2: CGPoint(x: 12.5 * scaleX, y: 16.1 * scaleY))
+        path.addCurve(to: CGPoint(x: 13.26 * scaleX, y: 20.45 * scaleY),
+                     control1: CGPoint(x: 12.5 * scaleX, y: 18.73 * scaleY),
+                     control2: CGPoint(x: 12.78 * scaleX, y: 19.67 * scaleY))
+        path.addCurve(to: CGPoint(x: 14.68 * scaleX, y: 22 * scaleY),
+                     control1: CGPoint(x: 13.63 * scaleX, y: 21.06 * scaleY),
+                     control2: CGPoint(x: 14.11 * scaleX, y: 21.59 * scaleY))
+        path.addLine(to: CGPoint(x: 8 * scaleX, y: 22 * scaleY))
+        path.addCurve(to: CGPoint(x: 3 * scaleX, y: 17 * scaleY),
+                     control1: CGPoint(x: 4.5 * scaleX, y: 22 * scaleY),
+                     control2: CGPoint(x: 3 * scaleX, y: 20 * scaleY))
+        path.addLine(to: CGPoint(x: 3 * scaleX, y: 8.5 * scaleY))
+        path.addCurve(to: CGPoint(x: 8 * scaleX, y: 3.5 * scaleY),
+                     control1: CGPoint(x: 3 * scaleX, y: 5.5 * scaleY),
+                     control2: CGPoint(x: 4.5 * scaleX, y: 3.5 * scaleY))
+        path.addLine(to: CGPoint(x: 16 * scaleX, y: 3.5 * scaleY))
+        path.addCurve(to: CGPoint(x: 21 * scaleX, y: 8.5 * scaleY),
+                     control1: CGPoint(x: 19.5 * scaleX, y: 3.5 * scaleY),
+                     control2: CGPoint(x: 21 * scaleX, y: 5.5 * scaleY))
+        path.closeSubpath()
+        
+        // Calendar lines
+        path.move(to: CGPoint(x: 7 * scaleX, y: 11 * scaleY))
+        path.addLine(to: CGPoint(x: 13 * scaleX, y: 11 * scaleY))
+        
+        path.move(to: CGPoint(x: 7 * scaleX, y: 16 * scaleY))
+        path.addLine(to: CGPoint(x: 9.62 * scaleX, y: 16 * scaleY))
+        
+        // Clock circle
+        path.move(to: CGPoint(x: 23 * scaleX, y: 17.75 * scaleY))
+        path.addCurve(to: CGPoint(x: 22.24 * scaleX, y: 20.45 * scaleY),
+                     control1: CGPoint(x: 23 * scaleX, y: 18.73 * scaleY),
+                     control2: CGPoint(x: 22.72 * scaleX, y: 19.67 * scaleY))
+        path.addCurve(to: CGPoint(x: 21.2 * scaleX, y: 21.69 * scaleY),
+                     control1: CGPoint(x: 21.96 * scaleX, y: 20.93 * scaleY),
+                     control2: CGPoint(x: 21.61 * scaleX, y: 21.35 * scaleY))
+        path.addCurve(to: CGPoint(x: 17.75 * scaleX, y: 23 * scaleY),
+                     control1: CGPoint(x: 20.28 * scaleX, y: 22.51 * scaleY),
+                     control2: CGPoint(x: 19.08 * scaleX, y: 23 * scaleY))
+        path.addCurve(to: CGPoint(x: 14.68 * scaleX, y: 22 * scaleY),
+                     control1: CGPoint(x: 16.6 * scaleX, y: 23 * scaleY),
+                     control2: CGPoint(x: 15.54 * scaleX, y: 22.63 * scaleY))
+        path.addCurve(to: CGPoint(x: 13.26 * scaleX, y: 20.45 * scaleY),
+                     control1: CGPoint(x: 14.11 * scaleX, y: 21.59 * scaleY),
+                     control2: CGPoint(x: 13.63 * scaleX, y: 21.06 * scaleY))
+        path.addCurve(to: CGPoint(x: 12.5 * scaleX, y: 17.75 * scaleY),
+                     control1: CGPoint(x: 12.78 * scaleX, y: 19.67 * scaleY),
+                     control2: CGPoint(x: 12.5 * scaleX, y: 18.73 * scaleY))
+        path.addCurve(to: CGPoint(x: 14.47 * scaleX, y: 13.66 * scaleY),
+                     control1: CGPoint(x: 12.5 * scaleX, y: 16.1 * scaleY),
+                     control2: CGPoint(x: 13.26 * scaleX, y: 14.61 * scaleY))
+        path.addCurve(to: CGPoint(x: 17.75 * scaleX, y: 12.5 * scaleY),
+                     control1: CGPoint(x: 15.37 * scaleX, y: 12.93 * scaleY),
+                     control2: CGPoint(x: 16.52 * scaleX, y: 12.5 * scaleY))
+        path.addCurve(to: CGPoint(x: 21 * scaleX, y: 13.63 * scaleY),
+                     control1: CGPoint(x: 18.98 * scaleX, y: 12.5 * scaleY),
+                     control2: CGPoint(x: 20.11 * scaleX, y: 12.92 * scaleY))
+        path.addCurve(to: CGPoint(x: 23 * scaleX, y: 17.75 * scaleY),
+                     control1: CGPoint(x: 22.22 * scaleX, y: 14.59 * scaleY),
+                     control2: CGPoint(x: 23 * scaleX, y: 16.08 * scaleY))
+        path.closeSubpath()
+        
+        // Star shape in clock
+        path.move(to: CGPoint(x: 17.75 * scaleX, y: 20.25 * scaleY))
+        path.addCurve(to: CGPoint(x: 20.25 * scaleX, y: 17.75 * scaleY),
+                     control1: CGPoint(x: 17.75 * scaleX, y: 18.87 * scaleY),
+                     control2: CGPoint(x: 18.87 * scaleX, y: 17.75 * scaleY))
+        path.addCurve(to: CGPoint(x: 17.75 * scaleX, y: 15.25 * scaleY),
+                     control1: CGPoint(x: 18.87 * scaleX, y: 17.75 * scaleY),
+                     control2: CGPoint(x: 17.75 * scaleX, y: 16.63 * scaleY))
+        path.addCurve(to: CGPoint(x: 15.25 * scaleX, y: 17.75 * scaleY),
+                     control1: CGPoint(x: 17.75 * scaleX, y: 16.63 * scaleY),
+                     control2: CGPoint(x: 16.63 * scaleX, y: 17.75 * scaleY))
+        path.addCurve(to: CGPoint(x: 17.75 * scaleX, y: 20.25 * scaleY),
+                     control1: CGPoint(x: 16.63 * scaleX, y: 17.75 * scaleY),
+                     control2: CGPoint(x: 17.75 * scaleX, y: 18.87 * scaleY))
+        path.closeSubpath()
+        
+        return path
+    }
+}

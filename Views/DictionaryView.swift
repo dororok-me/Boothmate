@@ -85,7 +85,7 @@ struct DictionaryView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         // 검색어
                         Text(currentWord)
-                            .font(.system(size: 28, weight: .bold))
+                            .font(.system(size: 24, weight: .medium))
                             .padding(.horizontal, 16)
                             .padding(.top, 20)
                             .padding(.bottom, 12)
@@ -247,7 +247,7 @@ struct DictionaryView: View {
                 let matches = numRegex.matches(in: raw, range: NSRange(raw.startIndex..., in: raw))
                 let results = matches.compactMap { m -> String? in
                     guard m.numberOfRanges > 1, let wr = Range(m.range(at: 1), in: raw) else { return nil }
-                    return String(raw[wr]).trimmingCharacters(in: .whitespaces)
+                    return cleanText(String(raw[wr]))
                 }.filter { !$0.isEmpty }
 
                 if !results.isEmpty {
@@ -325,6 +325,9 @@ struct DictionaryView: View {
             .replacingOccurrences(of: "&nbsp;", with: " ")
             .replacingOccurrences(of: "&#39;",  with: "'")
             .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&hellip;", with: "...")
+            .replacingOccurrences(of: "&#x27;", with: "'")
+            .replacingOccurrences(of: "&#8230;", with: "…")
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")

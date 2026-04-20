@@ -8,10 +8,7 @@ class SubscriptionManager: ObservableObject {
 
     static let shared = SubscriptionManager()
 
-    // 구독 상품 ID
     let productID = "com.dororok.Boothmate.monthly"
-
-    // 첫 실행일 저장 키
     private let firstLaunchKey = "boothmate_first_launch_date"
 
     @Published var isSubscribed: Bool = false
@@ -22,9 +19,11 @@ class SubscriptionManager: ObservableObject {
     private init() {
         setFirstLaunchDateIfNeeded()
         updateTrialStatus()
+        // ✅ 앱 실행시 구독 상태 자동 확인
+        Task {
+            await checkSubscriptionStatus()
+        }
     }
-
-    // MARK: - 첫 실행일 설정
 
     private func setFirstLaunchDateIfNeeded() {
         if UserDefaults.standard.object(forKey: firstLaunchKey) == nil {
@@ -32,28 +31,20 @@ class SubscriptionManager: ObservableObject {
         }
     }
 
-    // MARK: - 무료 체험 상태 확인
-
     func updateTrialStatus() {
         guard let firstDate = UserDefaults.standard.object(forKey: firstLaunchKey) as? Date else {
             isInTrialPeriod = true
             daysRemaining = 30
-            print("❌ firstDate 없음")
             return
         }
         let elapsed = Calendar.current.dateComponents([.day], from: firstDate, to: Date()).day ?? 0
         daysRemaining = max(0, 30 - elapsed)
         isInTrialPeriod = elapsed < 30
-        print("✅ elapsed: \(elapsed), isInTrialPeriod: \(isInTrialPeriod), canUseApp: \(canUseApp)")
     }
-
-    // MARK: - 앱 사용 가능 여부
 
     var canUseApp: Bool {
         return isInTrialPeriod || isSubscribed
     }
-
-    // MARK: - 상품 로드
 
     func loadProducts() async {
         do {
@@ -63,8 +54,6 @@ class SubscriptionManager: ObservableObject {
             print("상품 로드 실패: \(error)")
         }
     }
-
-    // MARK: - 구독 구매
 
     func purchase() async -> Bool {
         guard let product = products.first else {
@@ -97,8 +86,6 @@ class SubscriptionManager: ObservableObject {
         }
     }
 
-    // MARK: - 구독 복원
-
     func restorePurchases() async {
         do {
             try await AppStore.sync()
@@ -107,8 +94,6 @@ class SubscriptionManager: ObservableObject {
             print("복원 실패: \(error)")
         }
     }
-
-    // MARK: - 구독 상태 확인
 
     func checkSubscriptionStatus() async {
         for await result in Transaction.currentEntitlements {
@@ -121,8 +106,6 @@ class SubscriptionManager: ObservableObject {
         }
         isSubscribed = false
     }
-
-    // MARK: - 검증
 
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
         switch result {

@@ -637,15 +637,16 @@ struct VerticalContentView: View {
                 .buttonStyle(.plain)
                 .padding(12)
             } else {
-                VStack(spacing: 8) {
-                    Button {
-                        filePickerShown = true
-                    } label: {
+                Button {
+                    filePickerShown = true
+                } label: {
+                    VStack(spacing: 8) {
                         FileTabIcon(isSelected: false, iconSize: 88)
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .buttonStyle(.plain)
             }
         }
         .sheet(isPresented: $filePickerShown) {

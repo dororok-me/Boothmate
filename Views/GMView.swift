@@ -15,6 +15,7 @@ struct GMView: View {
 
     @State private var selectedItem: SelectedWordItem? = nil
     @State private var showDeleteAllAlert = false
+    @State private var searchText: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,18 +55,25 @@ struct GMView: View {
                 Spacer()
             } else {
                 if hideHeader && !gmStore.entries.isEmpty {
-                    HStack {
-                        Button {
-                            showDeleteAllAlert = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 13))
-                                .foregroundColor(.red.opacity(0.6))
-                                .frame(width: 28, height: 28)
-                        }
-                        .padding(.leading, 8)
-                        Spacer()
-                    }
+                                    HStack(spacing: 6) {
+                                        TextField("검색", text: $searchText)
+                                            .font(.system(size: 13))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 5)
+                                            .background(Color(.systemGray6))
+                                            .cornerRadius(8)
+                                            .frame(maxWidth: UIScreen.main.bounds.width * 0.4)
+                                        Button {
+                                            showDeleteAllAlert = true
+                                        } label: {
+                                            Image(systemName: "trash")
+                                                .font(.system(size: 13))
+                                                .foregroundColor(.red.opacity(0.6))
+                                                .frame(width: 28, height: 28)
+                                        }
+                                                                Spacer()
+                                                            }
+                                    .padding(.horizontal, 8)
                     .frame(height: toolbarHeight)
                     .background(Color(.systemBackground))
                     .overlay(
@@ -76,7 +84,7 @@ struct GMView: View {
 
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(gmStore.entries) { entry in
+                        ForEach(filteredEntries) { entry in
                             GMEntryRow(
                                 entry: entry,
                                 isInGlossary: isInGlossary(entry.word),
@@ -110,6 +118,13 @@ struct GMView: View {
         }
     }
 
+    private var filteredEntries: [GMStore.GMEntry] {
+        if searchText.isEmpty { return gmStore.entries }
+        return gmStore.entries.filter {
+            $0.word.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
     private func isInGlossary(_ word: String) -> Bool {
         glossaryStore.entries.contains {
             $0.source.lowercased() == word.lowercased() ||
