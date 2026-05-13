@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoothmatePlus - 윤커뮤니케이션 AI 동시통역 솔루션</title>
+<meta property="og:site_name" content="YOON Communication × BoothmatePlus">
+<meta property="og:title" content="윤커뮤니케이션 × BoothmatePlus — AI 동시통역 솔루션">
+<meta property="og:description" content="국제회의 통역사가 직접 개발한 AI 동시통역 솔루션. 인간 통역사의 통역 기법을 학습한 최초의 AI, 49개 언어 동시통역 지원.">
+<meta property="og:image" content="https://raw.githubusercontent.com/dororok-me/Boothmate/main/og_image_v2.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="윤커뮤니케이션 × BoothmatePlus AI 동시통역 솔루션">
+<meta property="og:url" content="https://dororok-me.github.io/Boothmate/">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="윤커뮤니케이션 × BoothmatePlus — AI 동시통역 솔루션">
+<meta name="twitter:description" content="국제회의 통역사가 직접 개발한 AI 동시통역 솔루션. 49개 언어 동시통역 지원.">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/dororok-me/Boothmate/main/og_image_v2.jpg">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/pretendard/1.3.9/variable/pretendardvariable.min.css" rel="stylesheet">
+<style>
+:root {
+  --navy-darkest: #0a0e1a;
+  --navy-dark: #0d1528;
+  --navy-mid: #132040;
+  --navy-light: #1a2d55;
+  --blue-accent: #2e6bd6;
+  --blue-bright: #4a8af4;
+  --blue-glow: #3b7bef;
+  --blue-soft: #5a9bff;
+  --gold: #c9a84c;
+  --white: #ffffff;
+  --gray-light: #b8c4d8;
+  --gray-mid: #7a8aa4;
+  --text-primary: #e8edf5;
+  --text-secondary: #99a8c2;
+  --card-bg: rgba(18, 30, 58, 0.7);
+  --card-border: rgba(74, 138, 244, 0.2);
+  --gradient-hero: linear-gradient(135deg, #0a0e1a 0%, #0f1d3a 40%, #162850 100%);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--navy-darkest);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  line-height: 1.7;
+}
+
+/* ── Utility ── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+.section-title {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+
+.section-subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  margin-bottom: 56px;
+  line-height: 1.6;
+}
+
+.accent { color: var(--blue-bright); }
+
+.divider {
+  width: 60px;
+  height: 3px;
+  background: var(--blue-accent);
+  margin: 0 auto 20px;
+  border-radius: 2px;
+}
+
+/* ── Header / Nav ── */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 16px 0;
+  backdrop-filter: blur(16px);
+  background: rgba(10, 14, 26, 0.8);
+  border-bottom: 1px solid rgba(74, 138, 244, 0.1);
+  transition: all 0.3s;
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.logo-yoon {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: 0.04em;
+}
+
+.logo-yoon span {
+  font-size: 0.7rem;
+  display: block;
+  color: var(--gray-mid);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+
+.logo-sep {
+  width: 1px;
+  height: 28px;
+  background: var(--gray-mid);
+  opacity: 0.4;
+}
+
+.logo-bp {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--blue-soft);
+  letter-spacing: 0.02em;
+}
+
+.nav-cta {
+  padding: 10px 24px;
+  background: var(--blue-accent);
+  color: var(--white);
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+}
+
+.nav-cta:hover {
+  background: var(--blue-bright);
+  box-shadow: 0 4px 20px rgba(74, 138, 244, 0.4);
+}
+
+/* ── Hero Section ── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  background: var(--gradient-hero);
+  overflow: hidden;
+}
+
+/* AI Chipset Background Pattern */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    /* Circuit traces */
+    linear-gradient(90deg, transparent 49.5%, rgba(74,138,244,0.04) 49.5%, rgba(74,138,244,0.04) 50.5%, transparent 50.5%),
+    linear-gradient(0deg, transparent 49.5%, rgba(74,138,244,0.04) 49.5%, rgba(74,138,244,0.04) 50.5%, transparent 50.5%);
+  background-size: 80px 80px;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 70% 30%, rgba(46, 107, 214, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 30% 70%, rgba(74, 138, 244, 0.08) 0%, transparent 40%);
+}
+
+/* Chipset decorative element */
+.chip-bg {
+  position: absolute;
+  right: -80px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 600px;
+  height: 600px;
+  opacity: 0.06;
+  z-index: 0;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 700px;
+  margin: 0 auto;
+  text-align: center;
+  padding-top: 80px;
+}
+
+.hero-left h1 {
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1.3;
+  margin-bottom: 20px;
+  letter-spacing: -0.03em;
+}
+
+.hero-left h1 .highlight {
+  background: linear-gradient(135deg, var(--blue-bright), var(--blue-soft));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-desc {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  margin-bottom: 36px;
+}
+
+.hero-desc strong { color: var(--text-primary); font-weight: 600; }
+
+.hero-buttons { display: flex; gap: 16px; }
+
+.btn-primary {
+  padding: 14px 36px;
+  background: var(--blue-accent);
+  color: var(--white);
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  background: var(--blue-bright);
+  box-shadow: 0 6px 30px rgba(74, 138, 244, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-outline {
+  padding: 14px 36px;
+  background: transparent;
+  color: var(--blue-soft);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+}
+
+.btn-outline:hover {
+  border-color: var(--blue-bright);
+  background: rgba(74, 138, 244, 0.08);
+}
+
+/* Hero Globe Background */
+.hero-globe-bg {
+  position: absolute;
+  right: 5%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 500px;
+  height: 500px;
+  z-index: 1;
+  opacity: 0.4;
+}
+
+.hero-globe-bg .globe-svg {
+  width: 100%;
+  height: 100%;
+  animation: globeSway 8s ease-in-out infinite;
+}
+
+@keyframes globeSway {
+  0%, 100% { transform: rotate(-2deg) scale(1); }
+  50% { transform: rotate(2deg) scale(1.02); }
+}
+
+@keyframes globeRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Language floating buttons */
+.lang-btn {
+  position: absolute;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid rgba(74, 138, 244, 0.2);
+  backdrop-filter: blur(4px);
+  cursor: default;
+  animation: langFloat 3s ease-in-out infinite;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+.lang-ko { top: 10%; right: 5%; background: rgba(46, 107, 214, 0.2); color: var(--blue-soft); animation-delay: 0s; }
+.lang-en { top: 30%; right: -5%; background: rgba(46, 107, 214, 0.2); color: var(--blue-soft); animation-delay: 0.5s; }
+.lang-ja { bottom: 25%; right: 0%; background: rgba(46, 107, 214, 0.2); color: var(--blue-soft); animation-delay: 1s; }
+.lang-zh { bottom: 8%; left: 10%; background: rgba(46, 107, 214, 0.2); color: var(--blue-soft); animation-delay: 1.5s; }
+.lang-fr { top: 8%; left: 10%; background: rgba(46, 107, 214, 0.2); color: var(--blue-soft); animation-delay: 2s; }
+.lang-es { bottom: 45%; left: -5%; background: rgba(46, 107, 214, 0.2); color: var(--blue-soft); animation-delay: 2.5s; }
+
+@keyframes langFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ── Services Section (3 parallel) ── */
+.services {
+  padding: 100px 0;
+  background: var(--navy-dark);
+  position: relative;
+}
+
+.services::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--card-border), transparent);
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.section-divider-line {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--blue-accent), var(--blue-bright), var(--blue-accent), transparent);
+  margin: 40px 0;
+}
+
+.service-card-wide {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.service-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 40px 28px;
+  text-align: center;
+  transition: all 0.4s;
+  position: relative;
+  overflow: hidden;
+}
+
+.service-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--blue-accent), var(--blue-bright));
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+.service-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(74, 138, 244, 0.4);
+  box-shadow: 0 12px 40px rgba(46, 107, 214, 0.2);
+}
+
+.service-card:hover::before { opacity: 1; }
+
+.service-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  background: linear-gradient(135deg, var(--blue-accent), var(--blue-bright));
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.service-icon svg {
+  width: 32px;
+  height: 32px;
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.service-card h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.service-card p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* Connector line between cards */
+.service-connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-top: 32px;
+  padding: 0 40px;
+}
+
+.connector-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--blue-accent);
+  flex-shrink: 0;
+}
+
+.connector-line {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, var(--blue-accent), var(--blue-bright));
+  position: relative;
+}
+
+.connector-line::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: -4px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid var(--blue-bright);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+/* ── BoothmatePlus 소개 ── */
+.about {
+  padding: 100px 0;
+  background: var(--navy-darkest);
+  position: relative;
+}
+
+.about-bp-section {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.about-bp-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.about-bp-tagline {
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  margin-bottom: 40px;
+  line-height: 1.7;
+}
+
+.about-bp-tagline strong {
+  color: var(--blue-soft);
+}
+
+.about-bp-features {
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 32px 36px;
+}
+
+.bp-feature-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--blue-bright);
+  margin-bottom: 20px;
+}
+
+.service-arrow {
+  font-size: 1.2rem;
+}
+
+.bp-feature-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bp-feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.bp-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue-bright);
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+/* ── 통역 서비스 (Parallel Cards) ── */
+.use-cases {
+  padding: 100px 0;
+  background: var(--navy-dark);
+}
+
+.use-case-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.use-case-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.4s;
+}
+
+.use-case-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px rgba(46, 107, 214, 0.15);
+}
+
+.use-case-thumb {
+  height: 220px;
+  background: linear-gradient(135deg, var(--navy-mid), var(--navy-light));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.use-case-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px 16px 0 0;
+}
+
+.use-case-info { padding: 24px; }
+
+.use-case-info h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.use-case-info p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* ── How it works ── */
+.how-it-works {
+  padding: 100px 0;
+  background: var(--navy-darkest);
+  position: relative;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  position: relative;
+}
+
+/* Arrow between steps */
+.steps-grid::before {
+  content: '';
+  position: absolute;
+  top: 44px;
+  left: calc(33.33% + 10px);
+  right: calc(33.33% + 10px);
+  height: 2px;
+  background: linear-gradient(90deg, var(--blue-accent), var(--blue-bright));
+}
+
+.step {
+  text-align: center;
+  position: relative;
+}
+
+.step-num {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue-accent), var(--blue-bright));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0 auto 20px;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 4px 20px rgba(46, 107, 214, 0.3);
+}
+
+.step-icon {
+  margin-bottom: 16px;
+}
+
+.step-icon svg {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: var(--blue-soft);
+  stroke-width: 1.5;
+}
+
+.step h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.step p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* ── 강점 ── */
+.strengths {
+  padding: 100px 0;
+  background: var(--navy-dark);
+}
+
+.strength-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+}
+
+.strength-item {
+  text-align: center;
+  padding: 28px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  transition: all 0.3s;
+}
+
+.strength-item:hover {
+  border-color: rgba(74, 138, 244, 0.4);
+  transform: translateY(-3px);
+}
+
+.strength-item svg {
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: var(--blue-bright);
+  stroke-width: 1.5;
+  margin-bottom: 14px;
+}
+
+.strength-item h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.strength-item p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ── CTA Section ── */
+.cta-section {
+  padding: 100px 0;
+  background: var(--navy-darkest);
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(46, 107, 214, 0.1), transparent 70%);
+}
+
+.cta-box {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.cta-box h2 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.cta-box p {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  margin-bottom: 40px;
+}
+
+.contact-info {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+
+.contact-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.contact-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--blue-bright);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.contact-value {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* ── Footer ── */
+.footer {
+  padding: 40px 0;
+  background: var(--navy-darkest);
+  border-top: 1px solid rgba(74, 138, 244, 0.1);
+  text-align: center;
+}
+
+.footer p {
+  color: var(--gray-mid);
+  font-size: 0.8rem;
+}
+
+.footer-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.footer-logos span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-mid);
+}
+
+/* ── Animations ── */
+.fade-in {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .hero-content { grid-template-columns: 1fr; gap: 40px; text-align: center; }
+  .hero-left h1 { font-size: 2.2rem; }
+  .hero-buttons { justify-content: center; }
+  .hero-globe-bg { width: 350px; height: 350px; right: -5%; opacity: 0.15; }
+  .strength-grid { grid-template-columns: repeat(3, 1fr); }
+  .service-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .service-grid,
+  .use-case-grid,
+  .steps-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+  .steps-grid::before { display: none; }
+  .strength-grid { grid-template-columns: repeat(2, 1fr); }
+  .section-title { font-size: 1.6rem; }
+  .hero-left h1 { font-size: 1.8rem; }
+  .contact-info { flex-direction: column; align-items: center; gap: 24px; }
+  .service-connector { display: none; }
+  .hero-globe-bg { width: 250px; height: 250px; right: -10%; opacity: 0.12; }
+  .hero-globe-bg .lang-btn { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── NAV ─── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" class="logo">
+      <img src="yoon_logo.png" alt="YOON Communication" style="height: 36px; object-fit: contain;">
+      <div class="logo-sep"></div>
+      <img src="boothmate_logo.jpg" alt="Boothmate" style="height: 36px; border-radius: 6px; object-fit: contain;">
+    </a>
+    <a href="#contact" class="nav-cta">Contact Us</a>
+  </div>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <!-- AI Chipset SVG Background -->
+  <svg class="chip-bg" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+    <!-- Central chip -->
+    <rect x="200" y="200" width="200" height="200" rx="20" fill="none" stroke="#4a8af4" stroke-width="1.5"/>
+    <rect x="230" y="230" width="140" height="140" rx="10" fill="none" stroke="#4a8af4" stroke-width="1"/>
+    <!-- Pins top -->
+    <line x1="250" y1="200" x2="250" y2="120" stroke="#4a8af4" stroke-width="1"/>
+    <line x1="300" y1="200" x2="300" y2="80" stroke="#4a8af4" stroke-width="1"/>
+    <line x1="350" y1="200" x2="350" y2="120" stroke="#4a8af4" stroke-width="1"/>
+    <!-- Pins bottom -->
+    <line x1="250" y1="400" x2="250" y2="480" stroke="#4a8af4" stroke-width="1"/>
+    <line x1="300" y1="400" x2="300" y2="520" stroke="#4a8af4" stroke-width="1"/>
+    <line x1="350" y1="400" x2="350" y2="480" stroke="#4a8af4" stroke-width="1"/>
+    <!-- Pins left -->
+    <line x1="200" y1="250" x2="120" y2="250" stroke="#4a8af4" stroke-width="1"/>
+    <line x1="200" y1="300" x2="80" y2="300" stroke="#4a8af4" stroke-width="1"/>
+    <line x1="200" y1="350" x2="120" y2="350" stroke="#4a8af4" stroke-width="1"/>
+    <!-- Pins right -->
+    <line x1="400" y1="250" x2="480" y2="250" stroke="#4a8af4" stroke-width="1"/>
+    <line x1="400" y1="300" x2="520" y2="300" stroke="#4a8af4" stroke-width="1"/>
+    <line x1="400" y1="350" x2="480" y2="350" stroke="#4a8af4" stroke-width="1"/>
+    <!-- Nodes -->
+    <circle cx="250" cy="120" r="4" fill="#4a8af4"/>
+    <circle cx="300" cy="80" r="4" fill="#4a8af4"/>
+    <circle cx="350" cy="120" r="4" fill="#4a8af4"/>
+    <circle cx="120" cy="250" r="4" fill="#4a8af4"/>
+    <circle cx="80" cy="300" r="4" fill="#4a8af4"/>
+    <circle cx="120" cy="350" r="4" fill="#4a8af4"/>
+    <circle cx="480" cy="250" r="4" fill="#4a8af4"/>
+    <circle cx="520" cy="300" r="4" fill="#4a8af4"/>
+    <circle cx="480" cy="350" r="4" fill="#4a8af4"/>
+    <circle cx="250" cy="480" r="4" fill="#4a8af4"/>
+    <circle cx="300" cy="520" r="4" fill="#4a8af4"/>
+    <circle cx="350" cy="480" r="4" fill="#4a8af4"/>
+    <!-- Inner circuit -->
+    <text x="270" y="310" fill="#4a8af4" font-size="36" font-weight="800" font-family="sans-serif">AI</text>
+  </svg>
+
+  <div class="container hero-content">
+    <div class="hero-left">
+      <h1>
+        윤커뮤니케이션이<br>
+        AI 동시통역 솔루션<br>
+        <span class="highlight">BoothmatePlus</span>와<br>
+        만났습니다
+      </h1>
+      <p class="hero-desc">
+        2014년 설립 이후 전국적으로 1,000여 건 이상의<br>
+        국제회의 통역을 진행해 온 <strong>윤커뮤니케이션</strong>,<br>
+        이제 AI 동시통역 솔루션 <strong>BoothmatePlus</strong>와 함께합니다.
+      </p>
+    </div>
+  </div>
+  <!-- Globe + Language buttons as background -->
+  <div class="hero-globe-bg">
+    <svg class="globe-svg" viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#0f1d3a"/>
+          <stop offset="100%" stop-color="#1a3a6e"/>
+        </linearGradient>
+        <radialGradient id="globeShine" cx="30%" cy="30%">
+          <stop offset="0%" stop-color="rgba(90,155,255,0.2)"/>
+          <stop offset="100%" stop-color="transparent"/>
+        </radialGradient>
+      </defs>
+      <!-- 바다 -->
+      <circle cx="210" cy="210" r="160" fill="url(#globeGrad)" stroke="#4a8af4" stroke-width="1.5"/>
+      <!-- 경도 (세로선 7개) -->
+      <ellipse cx="210" cy="210" rx="0" ry="160" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.4"/>
+      <ellipse cx="210" cy="210" rx="28" ry="160" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.35"/>
+      <ellipse cx="210" cy="210" rx="56" ry="160" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.35"/>
+      <ellipse cx="210" cy="210" rx="88" ry="160" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.3"/>
+      <ellipse cx="210" cy="210" rx="120" ry="160" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.3"/>
+      <ellipse cx="210" cy="210" rx="145" ry="160" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.25"/>
+      <!-- 위도 (가로선 7개) -->
+      <ellipse cx="210" cy="210" rx="160" ry="0" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.4"/>
+      <ellipse cx="210" cy="178" rx="152" ry="12" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.35"/>
+      <ellipse cx="210" cy="146" rx="130" ry="10" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.3"/>
+      <ellipse cx="210" cy="114" rx="95" ry="8" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.25"/>
+      <ellipse cx="210" cy="242" rx="152" ry="12" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.35"/>
+      <ellipse cx="210" cy="274" rx="130" ry="10" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.3"/>
+      <ellipse cx="210" cy="306" rx="95" ry="8" fill="none" stroke="#4a8af4" stroke-width="0.6" opacity="0.25"/>
+      <!-- 하이라이트 -->
+      <circle cx="210" cy="210" r="160" fill="url(#globeShine)"/>
+    </svg>
+    <div class="lang-btn lang-ko">🇰🇷 안녕하세요</div>
+    <div class="lang-btn lang-en">🇺🇸 Hello</div>
+    <div class="lang-btn lang-ja">🇯🇵 こんにちは</div>
+    <div class="lang-btn lang-zh">🇨🇳 你好</div>
+    <div class="lang-btn lang-fr">🇫🇷 Bonjour</div>
+    <div class="lang-btn lang-es">🇪🇸 Hola</div>
+  </div>
+</section>
+
+<!-- ─── SERVICES (3 Parallel) ─── -->
+<section class="services" id="services">
+  <div class="container">
+    <div class="divider"></div>
+    <h2 class="section-title">사업 분야</h2>
+    <p class="section-subtitle"></p>
+    <div class="service-grid service-grid-3">
+      <div class="service-card fade-in">
+        <div class="service-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </div>
+        <h3>통역 서비스</h3>
+        <p>동시통역 · 순차통역 · 수행통역<br>위스퍼링 통역 · 화상회의 통역</p>
+      </div>
+      <div class="service-card fade-in" style="transition-delay: 0.1s">
+        <div class="service-icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <h3>번역 서비스</h3>
+        <p>비즈니스 일반 · 법률/금융/회계<br>제조/건설 · IT/정보통신 · 교육/출판</p>
+      </div>
+      <div class="service-card fade-in" style="transition-delay: 0.2s">
+        <div class="service-icon">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>국제행사 MC</h3>
+        <p>외국어 MC · 한국어 MC<br>이중 언어 MC</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── ABOUT ─── -->
+<section class="about" id="about">
+  <div class="container">
+    <div class="about-bp-section fade-in">
+      <h2 class="about-bp-title">BoothmatePlus란?</h2>
+      <p class="about-bp-tagline">국제회의 통역사가 직접 개발한 <strong>AI 동시통역 솔루션</strong></p>
+      <div class="about-bp-features">
+        <div class="bp-feature-label">특징 <span class="service-arrow">›</span></div>
+        <ul class="bp-feature-list">
+          <li><span class="bp-bullet"></span>인간 동시통역사의 통역 기법을 학습한 최초의 AI 솔루션</li>
+          <li><span class="bp-bullet"></span>전문용어를 미리 등록·학습시켜 어떠한 회의에도 활용 가능</li>
+          <li><span class="bp-bullet"></span>다중 언어 송출 지원</li>
+          <li><span class="bp-bullet"></span>QR코드 스캔 시 모바일 기기로 자막 송출</li>
+          <li><span class="bp-bullet"></span>49개 언어 동시통역 지원</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 실제 현장 활용 ─── -->
+<section class="use-cases" id="cases">
+  <div class="container">
+    <div class="divider"></div>
+    <h2 class="section-title">실제 자막 영상</h2>
+    <p class="section-subtitle">전혀 편집되지 않은 실제 자막 영상입니다</p>
+    <div class="use-case-grid">
+      <div class="use-case-card fade-in">
+        <div class="use-case-thumb">
+          <video controls preload="auto" playsinline poster="" muted>
+            <source src="video_timcook.mp4#t=0.5" type="video/mp4">
+          </video>
+        </div>
+        <div class="use-case-info">
+          <h3>편안한 구어체 소화</h3>
+        </div>
+      </div>
+      <div class="use-case-card fade-in" style="transition-delay: 0.15s">
+        <div class="use-case-thumb">
+          <video controls preload="auto" playsinline poster="" muted>
+            <source src="video_trump.mp4#t=0.5" type="video/mp4">
+          </video>
+        </div>
+        <div class="use-case-info">
+          <h3>연설, 국제회의 등 격식 있는 행사</h3>
+        </div>
+      </div>
+      <div class="use-case-card fade-in" style="transition-delay: 0.3s">
+        <div class="use-case-thumb">
+          <video controls preload="auto" playsinline poster="" muted>
+            <source src="video_sebasi.mp4#t=0.5" type="video/mp4">
+          </video>
+        </div>
+        <div class="use-case-info">
+          <h3>한국식 화법을 학습하는 AI 언어 엔진</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── HOW IT WORKS ─── -->
+<section class="how-it-works">
+  <div class="container">
+    <div class="divider"></div>
+    <h2 class="section-title">How it works</h2>
+    <p class="section-subtitle"></p>
+    <div class="steps-grid">
+      <div class="step fade-in">
+        <div class="step-num">1</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3>솔루션 도입 상담</h3>
+        <p>행사 규모와 언어 조합에 맞춰<br>최적의 구성을 제안드립니다.</p>
+      </div>
+      <div class="step fade-in" style="transition-delay: 0.2s">
+        <div class="step-num">2</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h3>용어집 사전 세팅</h3>
+        <p>발표 자료와 전문 용어를 미리 등록하여<br>통역 품질을 극대화합니다.</p>
+      </div>
+      <div class="step fade-in" style="transition-delay: 0.4s">
+        <div class="step-num">3</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <h3>현장 실시간 운용</h3>
+        <p>현장 상황을 고려한 최적의 셋팅으로<br>완벽한 청중 경험을 보장합니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─── CTA ─── -->
+<section class="cta-section" id="contact">
+  <div class="container">
+    <div class="cta-box fade-in">
+      <h2>AI 동시통역의 새로운 기준,<br>지금 경험해 보세요</h2>
+      <div class="contact-info">
+        <div class="contact-item">
+          <span class="contact-label">Mobile</span>
+          <span class="contact-value">010-2211-8496</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">Tel</span>
+          <span class="contact-value">051-758-1215</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">E-mail</span>
+          <span class="contact-value">jjyun0324@naver.com</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-logos">
+      <img src="yoon_logo.png" alt="YOON Communication" style="height: 28px; object-fit: contain;">
+      <span style="opacity:0.3">×</span>
+      <img src="boothmate_logo.jpg" alt="Boothmate" style="height: 28px; border-radius: 4px; object-fit: contain;">
+    </div>
+    <p>© 2026 YOON COMMUNICATION & dororok AI Lab. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<!-- ─── Scroll Animation ─── -->
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
