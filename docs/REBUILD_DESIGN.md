@@ -220,3 +220,49 @@ users/{uid}/
 - [ ] 서버측 IAP 검증/티켓/App Attest 훅 — 누가/어디 레포에서 구현할지.
 - [ ] App Store Connect 캡쳐(App 정보·구독/IAP·가격·서명) 공유.
 ```
+
+---
+
+## 11. 서버 확장 설계 (결정 B — iOS 독립, relay 서버가 티켓까지 발급)
+
+> 대상 레포: `dororok-me/boothmateonline` (Node 18, `ws` + `@libsql/client`(Turso)). 기존 `server.js`에 **덧붙이는** 방식. Vercel/TransWizard 미사용.
+
+### 인증 모델
+- iOS는 **Firebase Auth**(Sign in with Apple + Google)로 로그인 → **Firebase ID 토큰(JWT)** 획득.
+- 모든 서버 호출에 `Authorization: Bearer <Firebase ID 토큰>`.
+- 서버는 토큰을 Google 공개키(JWKS)로 검증: `iss=https://securetoken.google.com/<projectId>`, `aud=<projectId>`. `user_id = 토큰의 email`(없으면 `sub`). → 기존 `user_balance.user_id`와 동일 체계.
+
+### 추가 엔드포인트 (기존 http 서버에 라우팅 추가)
+| 메서드/경로 | 인증 | 동작 |
+|---|---|---|
+| `POST /ticket` | Firebase | `seconds_left>0` 확인 → `relay_ticket`(UUID, 만료 5분, used=0) 생성 → `{ticket, secondsLeft}`. 0이면 402 `no_time`. **← Vercel 발급 대체** |
+| `POST /iap/verify` | Firebase | body `{jws|transactionId}` → **App Store Server API**로 검증 → `productId→seconds` 매핑 → `purchase` 테이블 멱등 기록 → `user_balance += seconds` → `{secondsLeft}` |
+| `POST /trial/claim` | Firebase | body App Attest attestation/assertion+keyId → 검증 → `trial_device`에 keyId 없으면 **+3600초 1회** → `{secondsLeft, granted}` |
+
+### 스키마 추가 (schema.sql)
+```sql
+CREATE TABLE IF NOT EXISTS purchase (
+  transaction_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL, product_id TEXT NOT NULL,
+  seconds INTEGER NOT NULL, ts INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+CREATE TABLE IF NOT EXISTS trial_device (
+  key_id TEXT PRIMARY KEY,           -- App Attest key id (기기당 1회)
+  user_id TEXT, granted_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+```
+
+### 🔒 보안 수정 (필수)
+- 현재 `server.js`는 WS 연결 시 처음 보는 user에게 `initializeQuota`로 **자동 5시간** 지급 → 공개 앱에선 무한 무료. **자동 지급 제거**. 잔여 0이면 연결 거부(4002), 무료는 `POST /trial/claim`(App Attest)로만 부여.
+- 공개 앱에 `RELAY_PASS_KEY` 금지 → 티켓 방식만.
+
+### 상품 → 시간 매핑 (기본안)
+- `com.dororok.Boothmate.pass.5h` → 18000초 · `com.dororok.Boothmate.pass.10h` → 36000초 · 무료체험 3600초.
+
+### Railway 환경변수 (신규)
+`FIREBASE_PROJECT_ID`, `APPSTORE_ISSUER_ID`, `APPSTORE_KEY_ID`, `APPSTORE_PRIVATE_KEY`(.p8), `APPSTORE_BUNDLE_ID=com.dororok.Boothmate`, `APPLE_TEAM_ID=7WHUP4PG44`. (기존 `GEMINI_API_KEY`, `TURSO_URL` 유지)
+
+### 구현 시 필요한 준비물 (값은 env로 주입 → 코드엔 비밀 없음)
+- Firebase 프로젝트 ID (+ Apple/Google 로그인 활성화).
+- App Store Connect **App Store Server API 키**(Issuer ID / Key ID / .p8) — 서버측 영수증 검증용.
+- 5h/10h 가격 확정(시간 매핑은 위 기본안).
