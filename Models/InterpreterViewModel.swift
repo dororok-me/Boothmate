@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import SwiftUI
+import Combine
 
 @MainActor
 final class InterpreterViewModel: ObservableObject {
