@@ -116,55 +116,53 @@ struct InterpreterView: View {
         }
     }
 
-    // MARK: - 자막 (상단 원문 / 하단 번역)
+    // MARK: - 자막 (문장마다 원문+번역 쌍으로 누적)
 
     private var subtitles: some View {
-        GeometryReader { geo in
-            VStack(spacing: 0) {
-                subtitlePane(title: "원문", color: .primary,
-                             lines: vm.segments.map { $0.source }, live: vm.liveSource)
-                    .frame(height: geo.size.height / 2)
-                Divider()
-                subtitlePane(title: "번역", color: .blue,
-                             lines: vm.segments.map { $0.translation }, live: vm.liveTranslation)
-                    .frame(height: geo.size.height / 2)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    ForEach(vm.segments) { seg in
+                        segmentRow(source: seg.source, translation: seg.translation)
+                            .id(seg.id)
+                    }
+                    if !vm.liveSource.isEmpty || !vm.liveTranslation.isEmpty {
+                        segmentRow(source: vm.liveSource, translation: vm.liveTranslation, live: true)
+                            .id("live")
+                    }
+                    Color.clear.frame(height: 1).id("bottom")
+                }
+                .padding(16)
             }
+            .onChange(of: vm.segments.count) { proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: vm.liveSource) { proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: vm.liveTranslation) { proxy.scrollTo("bottom", anchor: .bottom) }
         }
     }
 
-    private func subtitlePane(title: String, color: Color, lines: [String], live: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold)).foregroundColor(.secondary)
-                .padding(.horizontal, 16).padding(.top, 8)
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(lines.enumerated()), id: \.offset) { i, line in
-                            if !line.isEmpty {
-                                Text(line)
-                                    .font(.system(size: 20))
-                                    .foregroundColor(color)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(i)
-                            }
-                        }
-                        if !live.isEmpty {
-                            Text(live)
-                                .font(.system(size: 20))
-                                .foregroundColor(color.opacity(0.6))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .id("live")
-                        }
-                        Color.clear.frame(height: 1).id("bottom")
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 8)
-                }
-                .onChange(of: lines.count) { proxy.scrollTo("bottom", anchor: .bottom) }
-                .onChange(of: live) { proxy.scrollTo("bottom", anchor: .bottom) }
+    /// 한 문장 = 원문(작게, 보조색) + 번역(크게, 강조) 한 쌍.
+    private func segmentRow(source: String, translation: String, live: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if !source.isEmpty {
+                Text(source)
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !translation.isEmpty {
+                Text(translation)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .padding(.leading, 10)
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.blue.opacity(live ? 0.35 : 0.6))
+                .frame(width: 3)
+        }
+        .opacity(live ? 0.6 : 1)
     }
 
     // MARK: - 컨트롤 바
