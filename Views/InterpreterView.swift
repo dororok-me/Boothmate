@@ -121,23 +121,51 @@ struct InterpreterView: View {
     private var subtitles: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                let pairs = sentencePairs()
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(vm.segments) { seg in
-                        segmentRow(source: seg.source, translation: seg.translation)
-                            .id(seg.id)
-                    }
-                    if !vm.liveSource.isEmpty || !vm.liveTranslation.isEmpty {
-                        segmentRow(source: vm.liveSource, translation: vm.liveTranslation, live: true)
-                            .id("live")
+                    ForEach(Array(pairs.enumerated()), id: \.offset) { item in
+                        segmentRow(source: item.element.0,
+                                   translation: item.element.1,
+                                   live: vm.isRunning && item.offset == pairs.count - 1)
+                            .id(item.offset)
                     }
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(16)
             }
-            .onChange(of: vm.segments.count) { proxy.scrollTo("bottom", anchor: .bottom) }
-            .onChange(of: vm.liveSource) { proxy.scrollTo("bottom", anchor: .bottom) }
-            .onChange(of: vm.liveTranslation) { proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: vm.sourceText) { proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: vm.translationText) { proxy.scrollTo("bottom", anchor: .bottom) }
         }
+    }
+
+    /// 원문/번역을 각각 문장으로 나눠 인덱스로 짝지어 쌍을 만든다. (최근 40개만)
+    private func sentencePairs() -> [(String, String)] {
+        let src = Self.sentences(vm.sourceText)
+        let trg = Self.sentences(vm.translationText)
+        let n = max(src.count, trg.count)
+        guard n > 0 else { return [] }
+        var out: [(String, String)] = []
+        for i in 0..<n {
+            out.append((i < src.count ? src[i] : "", i < trg.count ? trg[i] : ""))
+        }
+        return out.count > 40 ? Array(out.suffix(40)) : out
+    }
+
+    /// 문장 종결부호(. ! ? 。 ！ ？ …) 기준으로 문장 분리.
+    static func sentences(_ text: String) -> [String] {
+        var result: [String] = []
+        var current = ""
+        for ch in text {
+            current.append(ch)
+            if ".!?。！？…".contains(ch) {
+                let s = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !s.isEmpty { result.append(s) }
+                current = ""
+            }
+        }
+        let tail = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !tail.isEmpty { result.append(tail) }
+        return result
     }
 
     /// 한 문장 = 원문(작게, 보조색) + 번역(크게, 강조) 한 쌍.

@@ -6,16 +6,9 @@ import Combine
 @MainActor
 final class InterpreterViewModel: ObservableObject {
 
-    struct Segment: Identifiable {
-        let id = UUID()
-        var source: String
-        var translation: String
-    }
-
-    // 자막
-    @Published var segments: [Segment] = []
-    @Published var liveSource = ""
-    @Published var liveTranslation = ""
+    // 누적 원문/번역 (표시 시 문장 단위로 나눠 쌍을 만든다)
+    @Published var sourceText = ""
+    @Published var translationText = ""
 
     // 실행 상태
     @Published var isRunning = false
@@ -27,7 +20,6 @@ final class InterpreterViewModel: ObservableObject {
     @Published var langA: InterpretLanguage = .ko
     @Published var langB: InterpretLanguage = .en
     @Published var dirMode: DirMode = .auto
-    /// 현재 출력(번역) 언어 — auto에서 감지로 전환됨.
     @Published var curTarget: InterpretLanguage = .en
 
     private let audio = AudioCapture()
@@ -62,9 +54,8 @@ final class InterpreterViewModel: ObservableObject {
     }
 
     private func begin() {
-        segments.removeAll()
-        liveSource = ""
-        liveTranslation = ""
+        sourceText = ""
+        translationText = ""
         userStopped = false
         reconnectAttempts = 0
         curTarget = defaultTarget()
@@ -85,7 +76,6 @@ final class InterpreterViewModel: ObservableObject {
         relay.disconnect()
         isRunning = false
         statusText = ""
-        flushLive()
     }
 
     // MARK: - 방향
@@ -93,25 +83,24 @@ final class InterpreterViewModel: ObservableObject {
     private func defaultTarget() -> InterpretLanguage {
         switch dirMode {
         case .bToA: return langA
-        default:    return langB   // auto 기본 방향은 A→B
+        default:    return langB
         }
     }
 
-    /// auto 모드: 감지된 입력의 반대 언어가 현재 타겟과 다르면 전환+재연결.
-    private func maybeFlipDirection(_ srcText: String) {
+    /// auto 모드: '이번 청크'의 언어를 감지해 반대 언어가 타겟과 다르면 전환+재연결.
+    private func maybeFlipDirection(_ chunk: String) {
         guard dirMode == .auto, isRunning, !userStopped else { return }
-        guard let det = LanguageDetector.detect(srcText, langA, langB) else { return }
+        guard let det = LanguageDetector.detect(chunk, langA, langB) else { return }
         let desired = (det.prefix == langA.prefix) ? langB : langA
         if desired.prefix == curTarget.prefix { return }
         print("[flip] 감지=\(det.code) 타겟 \(curTarget.code)→\(desired.code)")
         curTarget = desired
         statusText = "언어 방향 전환 중…"
-        liveTranslation = ""   // 이전 방향의 잘못된 번역 잔여 버림
         reconnectForFlip()
     }
 
     private func reconnectForFlip() {
-        relay.disconnect()   // userClosed=true → 옛 소켓 onClose 억제
+        relay.disconnect()
         connectRelay()
     }
 
@@ -161,10 +150,10 @@ final class InterpreterViewModel: ObservableObject {
         relay.onSource = { [weak self] t in
             Task { @MainActor in
                 guard let self = self else { return }
-                self.reconnectAttempts = 0   // 실데이터 수신 = 정상 세션 → 재시도 카운터 리셋
+                self.reconnectAttempts = 0
                 if self.isRunning { self.statusText = "통역 중" }
-                self.liveSource += t
-                // 감지는 누적본이 아니라 '이번 청크'로 (누적하면 한/영이 섞여 오판) — 웹앱과 동일
+                self.sourceText += t
+                self.trimIfNeeded()
                 self.maybeFlipDirection(t)
             }
         }
@@ -172,11 +161,12 @@ final class InterpreterViewModel: ObservableObject {
             Task { @MainActor in
                 guard let self = self else { return }
                 self.reconnectAttempts = 0
-                self.liveTranslation += t
+                self.translationText += t
+                self.trimIfNeeded()
             }
         }
         relay.onTurnComplete = { [weak self] in
-            Task { @MainActor in self?.flushLive() }
+            Task { @MainActor in self?.appendTurnBreak() }
         }
         relay.onTime = { [weak self] s in
             Task { @MainActor in self?.secondsLeft = s }
@@ -188,8 +178,6 @@ final class InterpreterViewModel: ObservableObject {
             }
         }
         relay.onOpen = { [weak self] in
-            // 열림만으로 카운터를 리셋하지 않는다(즉시 닫히는 무한 재연결 방지).
-            // 리셋은 실제 데이터(onSource/onTranslation) 수신 시에만.
             Task { @MainActor in
                 guard let self = self, self.isRunning else { return }
                 self.statusText = "통역 중"
@@ -200,7 +188,19 @@ final class InterpreterViewModel: ObservableObject {
         }
     }
 
-    /// 세션 만료(goAway)/네트워크 끊김 → 자동 재연결(백오프).
+    /// 턴 종료 시 다음 발화가 이전 문장과 붙지 않도록 공백 보장.
+    private func appendTurnBreak() {
+        if let l = sourceText.last, l != " ", l != "\n" { sourceText += " " }
+        if let l = translationText.last, l != " ", l != "\n" { translationText += " " }
+    }
+
+    /// 장시간 세션 메모리 방어 — 너무 길면 앞쪽을 잘라낸다.
+    private func trimIfNeeded() {
+        let cap = 8000
+        if sourceText.count > cap { sourceText = String(sourceText.suffix(cap)) }
+        if translationText.count > cap { translationText = String(translationText.suffix(cap)) }
+    }
+
     private func handleUnexpectedClose() {
         guard isRunning, !userStopped else { return }
         reconnectAttempts += 1
@@ -215,16 +215,5 @@ final class InterpreterViewModel: ObservableObject {
             guard let self = self, self.isRunning, !self.userStopped else { return }
             self.connectRelay()
         }
-    }
-
-    private func flushLive() {
-        let s = liveSource.trimmingCharacters(in: .whitespacesAndNewlines)
-        let t = liveTranslation.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !s.isEmpty || !t.isEmpty {
-            segments.append(Segment(source: s, translation: t))
-            if segments.count > 100 { segments.removeFirst(segments.count - 100) }
-        }
-        liveSource = ""
-        liveTranslation = ""
     }
 }
