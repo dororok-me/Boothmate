@@ -158,12 +158,18 @@ final class InterpreterViewModel: ObservableObject {
         relay.onSource = { [weak self] t in
             Task { @MainActor in
                 guard let self = self else { return }
+                self.reconnectAttempts = 0   // 실데이터 수신 = 정상 세션 → 재시도 카운터 리셋
+                if self.isRunning { self.statusText = "통역 중" }
                 self.liveSource += t
                 self.maybeFlipDirection(self.liveSource)
             }
         }
         relay.onTranslation = { [weak self] t in
-            Task { @MainActor in self?.liveTranslation += t }
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.reconnectAttempts = 0
+                self.liveTranslation += t
+            }
         }
         relay.onTurnComplete = { [weak self] in
             Task { @MainActor in self?.flushLive() }
@@ -178,10 +184,11 @@ final class InterpreterViewModel: ObservableObject {
             }
         }
         relay.onOpen = { [weak self] in
+            // 열림만으로 카운터를 리셋하지 않는다(즉시 닫히는 무한 재연결 방지).
+            // 리셋은 실제 데이터(onSource/onTranslation) 수신 시에만.
             Task { @MainActor in
-                guard let self = self else { return }
-                self.reconnectAttempts = 0
-                if self.isRunning { self.statusText = "통역 중" }
+                guard let self = self, self.isRunning else { return }
+                self.statusText = "통역 중"
             }
         }
         relay.onClose = { [weak self] _ in
@@ -194,7 +201,7 @@ final class InterpreterViewModel: ObservableObject {
         guard isRunning, !userStopped else { return }
         reconnectAttempts += 1
         if reconnectAttempts > 6 {
-            errorText = "연결이 불안정합니다. 다시 시작해 주세요."
+            errorText = "연결에 실패했습니다. 통과키와 네트워크를 확인하고 다시 시작해 주세요."
             stop()
             return
         }
