@@ -103,7 +103,7 @@ final class InterpreterViewModel: ObservableObject {
         guard let det = LanguageDetector.detect(srcText, langA, langB) else { return }
         let desired = (det.prefix == langA.prefix) ? langB : langA
         if desired.prefix == curTarget.prefix { return }
-        print("[flip] 감지=\(det.rawValue) 타겟 \(curTarget.rawValue)→\(desired.rawValue)")
+        print("[flip] 감지=\(det.code) 타겟 \(curTarget.code)→\(desired.code)")
         curTarget = desired
         statusText = "언어 방향 전환 중…"
         liveTranslation = ""   // 이전 방향의 잘못된 번역 잔여 버림
@@ -116,7 +116,7 @@ final class InterpreterViewModel: ObservableObject {
     }
 
     private func connectRelay() {
-        print("[connect] target=\(curTarget.rawValue) dir=\(dirMode.rawValue)")
+        print("[connect] target=\(curTarget.code) dir=\(dirMode.rawValue)")
         relay.connect(passKey: passKey, setup: makeSetup())
     }
 

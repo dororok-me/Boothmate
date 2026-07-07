@@ -97,7 +97,7 @@ struct InterpreterView: View {
 
     private func langMenu(selection: Binding<InterpretLanguage>) -> some View {
         Picker("", selection: selection) {
-            ForEach(InterpretLanguage.allCases) { lang in
+            ForEach(InterpretLanguage.all) { lang in
                 Text(lang.label).tag(lang)
             }
         }
