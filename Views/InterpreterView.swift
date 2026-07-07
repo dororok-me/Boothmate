@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// 통역 메인 화면 (P1).
-/// 상단 원문 / 하단 번역 2단 자막 + 시작·정지. 로그인/티켓(P2) 전이라
-/// 개발용 통과키(PASS_KEY)로 연결해 실기기에서 통역을 바로 검증한다.
+/// 통역 메인 화면 (P1.5 — 언어쌍 + 방향 자동/수동).
 struct InterpreterView: View {
     @StateObject private var vm = InterpreterViewModel()
     @AppStorage("dev_pass_key") private var devPassKey = ""
@@ -29,12 +27,21 @@ struct InterpreterView: View {
         .background(Color(.systemBackground).ignoresSafeArea())
     }
 
-    // MARK: - 헤더 (제목 + 잔여시간 배지)
+    // MARK: - 헤더
 
     private var header: some View {
-        HStack {
-            Text("Boothmate")
-                .font(.system(size: 18, weight: .bold))
+        HStack(spacing: 8) {
+            Text("Boothmate").font(.system(size: 18, weight: .bold))
+            if vm.isRunning {
+                Text("\(vm.langA.label) ⇄ \(vm.langB.label)")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                if vm.dirMode == .auto {
+                    Text("→ \(vm.curTarget.label)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.blue)
+                }
+            }
             Spacer()
             if let s = vm.secondsLeft {
                 Label(timeString(s), systemImage: "clock")
@@ -46,18 +53,36 @@ struct InterpreterView: View {
         .padding(.vertical, 10)
     }
 
-    // MARK: - 시작 전 설정
+    // MARK: - 시작 전 설정 (언어쌍 + 방향)
 
     private var setupPanel: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                langRow(title: "말하는 언어", selection: $vm.sourceLang)
-                langRow(title: "번역 언어", selection: $vm.targetLang)
+            VStack(alignment: .leading, spacing: 18) {
+
+                Text("언어쌍")
+                    .font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
+                HStack(spacing: 10) {
+                    langMenu(selection: $vm.langA)
+                    Image(systemName: "arrow.left.arrow.right").foregroundColor(.secondary)
+                    langMenu(selection: $vm.langB)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("번역 방향")
+                        .font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
+                    Picker("방향", selection: $vm.dirMode) {
+                        ForEach(DirMode.allCases) { m in
+                            Text(m.label(vm.langA, vm.langB)).tag(m)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text(dirHint)
+                        .font(.system(size: 11)).foregroundColor(.secondary)
+                }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("개발용 통과키 (임시 · P2에서 로그인으로 대체)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 12, weight: .medium)).foregroundColor(.secondary)
                     SecureField("PASS_KEY", text: $devPassKey)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -65,24 +90,29 @@ struct InterpreterView: View {
                         .background(Color.gray.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-
-                Text("‘시작’을 누르면 마이크 음성이 실시간으로 전사·번역됩니다.")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
             }
             .padding(16)
         }
     }
 
-    private func langRow(title: String, selection: Binding<InterpretLanguage>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 12, weight: .medium)).foregroundColor(.secondary)
-            Picker(title, selection: selection) {
-                ForEach(InterpretLanguage.allCases) { lang in
-                    Text(lang.label).tag(lang)
-                }
+    private func langMenu(selection: Binding<InterpretLanguage>) -> some View {
+        Picker("", selection: selection) {
+            ForEach(InterpretLanguage.allCases) { lang in
+                Text(lang.label).tag(lang)
             }
-            .pickerStyle(.segmented)
+        }
+        .pickerStyle(.menu)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(Color.gray.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var dirHint: String {
+        switch vm.dirMode {
+        case .auto: return "말하는 언어를 자동 인식해 양방향으로 번역합니다."
+        case .aToB: return "\(vm.langA.label) 음성만 \(vm.langB.label)(으)로 번역합니다."
+        case .bToA: return "\(vm.langB.label) 음성만 \(vm.langA.label)(으)로 번역합니다."
         }
     }
 
@@ -91,23 +121,13 @@ struct InterpreterView: View {
     private var subtitles: some View {
         GeometryReader { geo in
             VStack(spacing: 0) {
-                subtitlePane(
-                    title: "원문",
-                    color: .primary,
-                    lines: vm.segments.map { $0.source },
-                    live: vm.liveSource
-                )
-                .frame(height: geo.size.height / 2)
-
+                subtitlePane(title: "원문", color: .primary,
+                             lines: vm.segments.map { $0.source }, live: vm.liveSource)
+                    .frame(height: geo.size.height / 2)
                 Divider()
-
-                subtitlePane(
-                    title: "번역",
-                    color: .blue,
-                    lines: vm.segments.map { $0.translation },
-                    live: vm.liveTranslation
-                )
-                .frame(height: geo.size.height / 2)
+                subtitlePane(title: "번역", color: .blue,
+                             lines: vm.segments.map { $0.translation }, live: vm.liveTranslation)
+                    .frame(height: geo.size.height / 2)
             }
         }
     }
@@ -115,10 +135,8 @@ struct InterpreterView: View {
     private func subtitlePane(title: String, color: Color, lines: [String], live: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .font(.system(size: 10, weight: .semibold)).foregroundColor(.secondary)
+                .padding(.horizontal, 16).padding(.top, 8)
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -141,8 +159,7 @@ struct InterpreterView: View {
                         }
                         Color.clear.frame(height: 1).id("bottom")
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16).padding(.vertical, 8)
                 }
                 .onChange(of: lines.count) { proxy.scrollTo("bottom", anchor: .bottom) }
                 .onChange(of: live) { proxy.scrollTo("bottom", anchor: .bottom) }
@@ -158,12 +175,10 @@ struct InterpreterView: View {
         } label: {
             HStack {
                 Image(systemName: vm.isRunning ? "stop.fill" : "play.fill")
-                Text(vm.isRunning ? "정지" : "시작")
-                    .font(.system(size: 16, weight: .semibold))
+                Text(vm.isRunning ? "정지" : "시작").font(.system(size: 16, weight: .semibold))
             }
             .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            .frame(maxWidth: .infinity).frame(height: 52)
             .background(vm.isRunning ? Color.red : Color(red: 0.25, green: 0.78, blue: 0.65))
         }
         .buttonStyle(.plain)

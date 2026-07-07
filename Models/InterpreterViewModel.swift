@@ -12,7 +12,7 @@ final class InterpreterViewModel: ObservableObject {
         var translation: String
     }
 
-    // 자막 상태
+    // 자막
     @Published var segments: [Segment] = []
     @Published var liveSource = ""
     @Published var liveTranslation = ""
@@ -21,16 +21,23 @@ final class InterpreterViewModel: ObservableObject {
     @Published var isRunning = false
     @Published var secondsLeft: Int?
     @Published var errorText: String?
+    @Published var statusText = ""
 
-    // 언어 선택
-    @Published var sourceLang: InterpretLanguage = .ko
-    @Published var targetLang: InterpretLanguage = .en
+    // 언어쌍 + 방향
+    @Published var langA: InterpretLanguage = .ko
+    @Published var langB: InterpretLanguage = .en
+    @Published var dirMode: DirMode = .auto
+    /// 현재 출력(번역) 언어 — auto에서 감지로 전환됨.
+    @Published var curTarget: InterpretLanguage = .en
 
     private let audio = AudioCapture()
     private let relay = RelayClient()
 
+    private var passKey = ""
+    private var userStopped = false
+    private var reconnectAttempts = 0
+
     init() {
-        // 오디오 스레드에서 relay로 직접 전송 (VM 상태 미접근)
         let relay = self.relay
         audio.onPCM16 = { data in
             relay.sendAudio(base64: data.base64EncodedString())
@@ -43,24 +50,29 @@ final class InterpreterViewModel: ObservableObject {
     func start(passKey: String) {
         errorText = nil
         guard !passKey.isEmpty else { errorText = "개발용 통과키를 입력하세요"; return }
+        self.passKey = passKey
 
         AVAudioApplication.requestRecordPermission { [weak self] granted in
             Task { @MainActor in
                 guard let self = self else { return }
                 guard granted else { self.errorText = "마이크 권한이 필요합니다"; return }
-                self.begin(passKey: passKey)
+                self.begin()
             }
         }
     }
 
-    private func begin(passKey: String) {
+    private func begin() {
         segments.removeAll()
         liveSource = ""
         liveTranslation = ""
-        relay.connect(passKey: passKey, setup: makeSetup())
+        userStopped = false
+        reconnectAttempts = 0
+        curTarget = defaultTarget()
+        connectRelay()
         do {
             try audio.start()
             isRunning = true
+            statusText = "통역 중"
         } catch {
             errorText = "오디오 시작 실패: \(error.localizedDescription)"
             relay.disconnect()
@@ -68,29 +80,71 @@ final class InterpreterViewModel: ObservableObject {
     }
 
     func stop() {
+        userStopped = true
         audio.stop()
         relay.disconnect()
         isRunning = false
+        statusText = ""
         flushLive()
     }
 
-    // MARK: - 내부
+    // MARK: - 방향
+
+    private func defaultTarget() -> InterpretLanguage {
+        switch dirMode {
+        case .bToA: return langA
+        default:    return langB   // auto 기본 방향은 A→B
+        }
+    }
+
+    /// auto 모드: 감지된 입력의 반대 언어가 현재 타겟과 다르면 전환+재연결.
+    private func maybeFlipDirection(_ srcText: String) {
+        guard dirMode == .auto, isRunning, !userStopped else { return }
+        guard let det = LanguageDetector.detect(srcText, langA, langB) else { return }
+        let desired = (det.prefix == langA.prefix) ? langB : langA
+        if desired.prefix == curTarget.prefix { return }
+        curTarget = desired
+        statusText = "언어 방향 전환 중…"
+        reconnectForFlip()
+    }
+
+    private func reconnectForFlip() {
+        relay.disconnect()   // userClosed=true → 옛 소켓 onClose 억제
+        connectRelay()
+    }
+
+    private func connectRelay() {
+        relay.connect(passKey: passKey, setup: makeSetup())
+    }
+
+    // MARK: - setup 메시지
 
     private func makeSetup() -> [String: Any] {
-        let instruction =
-            "You are a professional simultaneous interpreter. " +
-            "Translate every \(sourceLang.englishName) utterance into \(targetLang.englishName). " +
-            "Output ONLY \(targetLang.englishName); never echo the input language. " +
+        let target = curTarget
+        let other = (target.prefix == langA.prefix) ? langB : langA
+
+        var instruction =
+            "You are a professional simultaneous interpreter between \(langA.englishName) and \(langB.englishName). " +
+            "The expected input is \(other.englishName). Translate every input utterance into \(target.englishName). " +
+            "Output ONLY \(target.englishName); never echo the input language. " +
+            "LANGUAGE LOCK — this session handles ONLY \(langA.englishName) and \(langB.englishName). " +
+            "If an utterance is spoken in any OTHER language, IGNORE it and output nothing. " +
             "CRITICAL — preserve every number's exact magnitude. Korean units: " +
-            "만=10 thousand, 십만=100 thousand, 백만=1 million, 천만=10 million, " +
-            "억=100 million, 십억=1 billion, 조=1 trillion. " +
+            "만=10 thousand, 십만=100 thousand, 백만=1 million, 천만=10 million, 억=100 million, 십억=1 billion, 조=1 trillion " +
+            "(e.g., 3천만 달러 → 30 million dollars, 2.2억 원 → 220 million won). Never change the order of magnitude. " +
             "Keep each number as one contiguous token."
+
+        if dirMode != .auto {
+            instruction +=
+                " ONE-WAY MODE — translate ONLY \(other.englishName) speech into \(target.englishName). " +
+                "If an utterance is already in \(target.englishName), stay silent and output nothing."
+        }
 
         return [
             "model": AppConfig.geminiModel,
             "generationConfig": [
                 "responseModalities": ["AUDIO"],
-                "translationConfig": ["targetLanguageCode": targetLang.geminiCode],
+                "translationConfig": ["targetLanguageCode": target.geminiCode],
             ],
             "inputAudioTranscription": [:],
             "outputAudioTranscription": [:],
@@ -98,9 +152,15 @@ final class InterpreterViewModel: ObservableObject {
         ]
     }
 
+    // MARK: - 릴레이 콜백
+
     private func wireRelay() {
         relay.onSource = { [weak self] t in
-            Task { @MainActor in self?.liveSource += t }
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.liveSource += t
+                self.maybeFlipDirection(self.liveSource)
+            }
         }
         relay.onTranslation = { [weak self] t in
             Task { @MainActor in self?.liveTranslation += t }
@@ -117,12 +177,32 @@ final class InterpreterViewModel: ObservableObject {
                 self?.stop()
             }
         }
-        relay.onClose = { [weak self] reason in
+        relay.onOpen = { [weak self] in
             Task { @MainActor in
-                guard let self = self, self.isRunning else { return }
-                self.errorText = "연결 종료: \(reason ?? "알 수 없음")"
-                self.stop()
+                guard let self = self else { return }
+                self.reconnectAttempts = 0
+                if self.isRunning { self.statusText = "통역 중" }
             }
+        }
+        relay.onClose = { [weak self] _ in
+            Task { @MainActor in self?.handleUnexpectedClose() }
+        }
+    }
+
+    /// 세션 만료(goAway)/네트워크 끊김 → 자동 재연결(백오프).
+    private func handleUnexpectedClose() {
+        guard isRunning, !userStopped else { return }
+        reconnectAttempts += 1
+        if reconnectAttempts > 6 {
+            errorText = "연결이 불안정합니다. 다시 시작해 주세요."
+            stop()
+            return
+        }
+        statusText = "재연결 중… (\(reconnectAttempts))"
+        let delay = min(Double(reconnectAttempts) * 0.5, 3.0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self = self, self.isRunning, !self.userStopped else { return }
+            self.connectRelay()
         }
     }
 
