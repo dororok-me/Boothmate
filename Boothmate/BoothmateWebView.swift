@@ -47,17 +47,23 @@ struct BoothmateSplashView: View {
 
 struct BoothmateRootView: View {
     @StateObject private var loadState = WebLoadState()
+    @StateObject private var signIn = SignInManager()
 
     var body: some View {
         ZStack {
-            BoothmateWebView(loadState: loadState)
+            BoothmateWebView(loadState: loadState, signIn: signIn)
                 .ignoresSafeArea(edges: .bottom)
-            if !loadState.ready {
-                BoothmateSplashView()
+
+            if signIn.user == nil {
+                LoginGateView(signIn: signIn)          // 로그인 전: 애플 로그인 게이트
+                    .transition(.opacity)
+            } else if !loadState.ready {
+                BoothmateSplashView()                  // 로그인 후·로딩 중: 스플래시
                     .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.4), value: loadState.ready)
+        .animation(.easeInOut(duration: 0.4), value: signIn.user)
         .onAppear {
             // 폴백: 준비 신호가 안 와도 최대 15초 후엔 스플래시 해제
             DispatchQueue.main.asyncAfter(deadline: .now() + 15) { loadState.ready = true }
@@ -71,10 +77,12 @@ struct BoothmateWebView: UIViewRepresentable {
 
     static let remoteURL = URL(string: "https://online.boothmate.co.kr/?app=ios&lang=en")!
     let loadState: WebLoadState
+    let signIn: SignInManager
 
     func makeCoordinator() -> Coordinator {
         let c = Coordinator()
         c.loadState = loadState
+        c.user = signIn.user
         return c
     }
 
@@ -90,6 +98,7 @@ struct BoothmateWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "bmReady")
 
         let webView = WKWebView(frame: .zero, configuration: config)
+        context.coordinator.webViewRef = webView
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.scrollView.contentInsetAdjustmentBehavior = .never
@@ -100,7 +109,10 @@ struct BoothmateWebView: UIViewRepresentable {
         return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {}
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        context.coordinator.user = signIn.user
+        context.coordinator.tryInjectLogin()   // 로그인 후 웹에 사용자 주입
+    }
 
     // 실제 마이크 사용 시점에만 오디오 카테고리 설정 (setActive는 안 함 — 시작 지연 방지)
     private static var audioConfigured = false
@@ -116,7 +128,26 @@ struct BoothmateWebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         weak var loadState: WebLoadState?
+        weak var webViewRef: WKWebView?
+        var user: SignInManager.AppleUser?
         private var didFallback = false
+        private var loaded = false
+        private var injectedEmail: String?
+
+        private func jsQuote(_ s: String) -> String {
+            var t = s.replacingOccurrences(of: "\\", with: "\\\\")
+            t = t.replacingOccurrences(of: "'", with: "\\'")
+            t = t.replacingOccurrences(of: "\n", with: " ")
+            return "'\(t)'"
+        }
+
+        /// 로그인된 애플 사용자를 웹 로그인 브리지로 주입 (로드 완료 + 사용자 존재 시 1회).
+        func tryInjectLogin() {
+            guard loaded, let u = user, injectedEmail != u.email, let wv = webViewRef else { return }
+            injectedEmail = u.email
+            let js = "if(window.__boothmateNativeLogin){window.__boothmateNativeLogin({email:\(jsQuote(u.email)),name:\(jsQuote(u.name))});}"
+            wv.evaluateJavaScript(js)
+        }
 
         /// 웹이 "화면 렌더 완료"를 알리면 스플래시 숨김.
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -136,14 +167,9 @@ struct BoothmateWebView: UIViewRepresentable {
 
         /// 로드 완료 → 자동 로그인 + 두 번의 애니메이션 프레임 뒤(실제 렌더됨) 준비 신호.
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            let js = """
-            if (window.__boothmateNativeLogin) {
-              window.__boothmateNativeLogin({ email: 'dororok@gmail.com', name: 'Boothmate' });
-            }
-            requestAnimationFrame(function(){ requestAnimationFrame(function(){
-              try { window.webkit.messageHandlers.bmReady.postMessage('ready'); } catch(e) {}
-            }); });
-            """
+            loaded = true
+            tryInjectLogin()   // 이미 로그인돼 있으면 웹에 주입
+            let js = "requestAnimationFrame(function(){requestAnimationFrame(function(){try{window.webkit.messageHandlers.bmReady.postMessage('ready');}catch(e){}});});"
             webView.evaluateJavaScript(js)
         }
 
