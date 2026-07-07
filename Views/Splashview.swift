@@ -1,5 +1,4 @@
 import SwiftUI
-import WebKit
 
 struct SplashView: View {
     @Binding var isFinished: Bool
@@ -17,20 +16,13 @@ struct SplashView: View {
         "실시간 환율 정보를 업데이트 중입니다"
     ]
     @State private var messageIndex: Int = 0
-    @State private var messageOpacity: CGFloat = 1
     @State private var showReady: Bool = false
 
     // 마침표 세 개가 순서대로 켜지고 사라지는 애니메이션
     @State private var dotPhase: Int = 0
-    @State private var dotTimer: Timer? = nil
 
-    // 각 단계 완료 플래그
-    @State private var scheduleDone: Bool = false
-    @State private var warmupDone: Bool = false
-    @State private var didFinish: Bool = false
-
-    // 한 메시지가 화면에 머무는 시간
-    private let messageDuration: Double = 1.2
+    // 한 메시지가 화면에 머무는 시간 (0.3초 tick × ticksPerMessage)
+    private let ticksPerMessage: Int = 4
 
     var body: some View {
         ZStack {
@@ -77,10 +69,10 @@ struct SplashView: View {
                                 Text(statusMessages[messageIndex])
                                     .font(.system(size: 13))
                                     .foregroundColor(.secondary)
+                                    .id(messageIndex)
+                                    .transition(.opacity)
                                 animatedDots
                             }
-                            .opacity(messageOpacity)
-                            .id(messageIndex)
                         }
                     }
                     .opacity(statusOpacity)
@@ -94,12 +86,8 @@ struct SplashView: View {
                 .padding(.bottom, 52)
             }
         }
-        .onAppear {
-            startAnimation()
-            startWarmup()
-        }
-        .onDisappear {
-            dotTimer?.invalidate()
+        .task {
+            await runSequence()
         }
     }
 
@@ -116,154 +104,55 @@ struct SplashView: View {
         }
     }
 
-    private func startAnimation() {
+    // MARK: - 로딩 시퀀스 (Timer 대신 async/await로 구동해 시작 시 main-thread 지터에 덜 취약)
+
+    @MainActor
+    private func runSequence() async {
         // 1단계: 로고 페이드인
-        withAnimation(.easeOut(duration: 0.6)) {
+        withAnimation(.easeOut(duration: 0.5)) {
             logoOpacity = 1
             logoScale = 1.0
         }
+        await sleep(0.25)
 
         // 2단계: 서브타이틀
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            withAnimation(.easeOut(duration: 0.5)) {
-                taglineOpacity = 1
-            }
+        withAnimation(.easeOut(duration: 0.4)) {
+            taglineOpacity = 1
+        }
+        await sleep(0.2)
+
+        // 3단계: 로딩 상태 등장
+        withAnimation(.easeOut(duration: 0.4)) {
+            statusOpacity = 1
+            labOpacity = 1
         }
 
-        // 3단계: 로딩 상태 등장 + 메시지 시퀀스 시작
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            withAnimation(.easeOut(duration: 0.4)) {
-                statusOpacity = 1
-                labOpacity = 1
-            }
-            startDotAnimation()
-            scheduleMessages()
-        }
-    }
-
-    private func startDotAnimation() {
-        dotTimer?.invalidate()
-        dotPhase = 0
-        dotTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { _ in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                dotPhase = (dotPhase + 1) % 4
-            }
-        }
-    }
-
-    // 각 메시지를 순서대로 보여준다. 마지막 메시지까지 노출되면 scheduleDone 처리.
-    private func scheduleMessages() {
+        // 4단계: 메시지 시퀀스 (각 메시지를 순서대로 노출하며 마침표 애니메이션 재생)
         for index in statusMessages.indices {
-            let delay = messageDuration * Double(index)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard !didFinish else { return }
-                advanceMessage(to: index)
+            if index != 0 {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    messageIndex = index
+                }
             }
-        }
-
-        // 모든 메시지를 최소 한 번씩 노출한 뒤에야 스플래시 종료를 허용
-        let totalDuration = messageDuration * Double(statusMessages.count)
-        DispatchQueue.main.asyncAfter(deadline: .now() + totalDuration) {
-            scheduleDone = true
-            maybeFinish()
-        }
-    }
-
-    private func advanceMessage(to index: Int) {
-        // 짧게 페이드 아웃 → 텍스트 교체 → 페이드 인
-        if index == 0 {
-            messageIndex = 0
-            messageOpacity = 1
-            return
-        }
-        withAnimation(.easeIn(duration: 0.18)) {
-            messageOpacity = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            messageIndex = index
-            withAnimation(.easeOut(duration: 0.22)) {
-                messageOpacity = 1
-            }
-        }
-    }
-
-    private func startWarmup() {
-        // WKWebView 워밍업 (백그라운드에서 다음 사전 미리 로드)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            WarmupWebView.shared.warmup {
-                DispatchQueue.main.async {
-                    warmupDone = true
-                    maybeFinish()
+            for _ in 0..<ticksPerMessage {
+                await sleep(0.3)
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    dotPhase = (dotPhase + 1) % 4
                 }
             }
         }
-    }
 
-    // 워밍업과 메시지 시퀀스가 모두 끝났을 때만 종료
-    private func maybeFinish() {
-        guard scheduleDone, warmupDone, !didFinish else { return }
-        didFinish = true
-
-        dotTimer?.invalidate()
-        dotTimer = nil
-
+        // 5단계: 준비 완료 → 전환
         withAnimation(.easeInOut(duration: 0.25)) {
             showReady = true
         }
-
-        // "준비 완료"를 잠깐 보여주고 전환
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            withAnimation(.easeInOut(duration: 0.4)) {
-                isFinished = true
-            }
-        }
-    }
-}
-
-// MARK: - WebView 워밍업
-
-class WarmupWebView: NSObject, WKNavigationDelegate {
-    static let shared = WarmupWebView()
-    private var webView: WKWebView?
-    private var completion: (() -> Void)?
-    private var timer: Timer?
-
-    func warmup(completion: @escaping () -> Void) {
-        self.completion = completion
-
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = WKWebsiteDataStore.default()
-        let wv = WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: config)
-        wv.navigationDelegate = self
-        self.webView = wv
-
-        if let url = URL(string: "https://dic.daum.net/search.do?q=hello&dic=eng&search_first=Y&lang=EN_KO") {
-
-            wv.load(URLRequest(url: url))
-        }
-
-        // 최대 3초 대기 후 강제 완료
-        timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
-            self?.finish()
+        await sleep(0.5)
+        withAnimation(.easeInOut(duration: 0.4)) {
+            isFinished = true
         }
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        finish()
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        finish()
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        finish()
-    }
-
-    private func finish() {
-        timer?.invalidate()
-        timer = nil
-        completion?()
-        completion = nil
+    private func sleep(_ seconds: Double) async {
+        try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
     }
 }

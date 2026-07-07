@@ -49,6 +49,7 @@ struct ContentView: View {
                 SFSpeechRecognizer.requestAuthorization { _ in }
                 AVAudioApplication.requestRecordPermission { _ in }
                 Task { @MainActor in currencyConverter.fetchRates() }
+                DictionaryPrewarmer.prewarm()
             }
         }
         .sheet(isPresented: $showPaywall) {

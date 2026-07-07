@@ -1,5 +1,22 @@
 import SwiftUI
 
+// MARK: - Dictionary Prewarmer
+// 첫 사전 검색 지연을 줄이기 위해 dic.daum.net 으로의 DNS/TLS 연결을 미리 데운다.
+// 백그라운드에서 가볍게 한 번만 수행하며, 앱 시작(메인 스레드)에는 영향을 주지 않는다.
+enum DictionaryPrewarmer {
+    private static var didRun = false
+
+    static func prewarm() {
+        guard !didRun else { return }
+        didRun = true
+        guard let url = URL(string: "https://dic.daum.net/search.do?q=hello&dic=eng") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 5
+        URLSession.shared.dataTask(with: request).resume()
+    }
+}
+
 // MARK: - DictionaryView
 
 struct DictionaryView: View {
