@@ -70,14 +70,59 @@ class CurrencyConverter: ObservableObject {
             // 3. 한국어 달러 표현
             output = convertKoreanDollar(in: output)
 
-            // 4. million/billion/trillion
+            // 4. million/billion/trillion ($ 기호)
             output = convertLargeAmount(in: output)
+
+            // 4-2. 영어 "N (million/billion/trillion) dollars" (기호 없이 단어)
+            output = convertEnglishDollarsWord(in: output)
 
             // 5. 일반 외화 → 원화
             output = convertForeignToKRW(in: output)
 
             return output
         }
+
+    // MARK: - 영어: "N dollars" / "N million dollars" (기호 $ 없이)
+
+    private func convertEnglishDollarsWord(in text: String) -> String {
+        guard let rate = rates["USD"], rate > 0 else { return text }
+        var output = text
+
+        let bigUnits: [(String, Double)] = [
+            ("trillion", 1_000_000_000_000),
+            ("billion", 1_000_000_000),
+            ("million", 1_000_000),
+        ]
+        for (word, mult) in bigUnits {
+            let pattern = "(\\d+(?:,\\d+)*(?:\\.\\d+)?)\\s*\(word)\\s*dollars"
+            output = annotateUSDamount(in: output, pattern: pattern, rate: rate, multiplier: mult)
+        }
+        output = annotateUSDamount(in: output, pattern: "(\\d+(?:,\\d+)*(?:\\.\\d+)?)\\s*dollars", rate: rate, multiplier: 1)
+        return output
+    }
+
+    private func annotateUSDamount(in text: String, pattern: String, rate: Double, multiplier: Double) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return text }
+        var output = text
+        let nsText = output as NSString
+        let matches = regex.matches(in: output, range: NSRange(location: 0, length: nsText.length))
+
+        for match in matches.reversed() {
+            let fullMatch = nsText.substring(with: match.range)
+            let afterIndex = match.range.location + match.range.length
+            if afterIndex < nsText.length && nsText.character(at: afterIndex) == 40 { continue } // 이미 "(" 병기됨
+
+            let beforeText = nsText.substring(to: match.range.location)
+            if beforeText.filter({ $0 == "(" }).count > beforeText.filter({ $0 == ")" }).count { continue }
+
+            let numStr = nsText.substring(with: match.range(at: 1)).replacingOccurrences(of: ",", with: "")
+            guard let amount = Double(numStr) else { continue }
+
+            let krw = amount * multiplier * rate
+            output = (output as NSString).replacingCharacters(in: match.range, with: "\(fullMatch)(\(formatKRW(krw)))")
+        }
+        return output
+    }
 
     // MARK: - 영어: 외화 → 원화
 
