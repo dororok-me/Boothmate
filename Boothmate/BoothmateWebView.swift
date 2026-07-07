@@ -15,6 +15,16 @@ struct BoothmateSplashView: View {
     @State private var appeared = false
     @State private var pulse = false
 
+    // 로딩 중 순서대로 보여줄 메시지
+    private let loadingMessages = [
+        "최신 언어 엔진을 로딩 중입니다",
+        "언어 엔진 최적화를 확인합니다",
+        "실시간 환율 정보를 업데이트 중입니다"
+    ]
+    @State private var statusText = "최신 언어 엔진을 로딩 중입니다"
+    @State private var tickCount = 0
+    @State private var dotTimer: Timer? = nil
+
     var body: some View {
         ZStack {
             // 로고와 어울리는 파랑→초록 그라데이션 배경
@@ -25,20 +35,49 @@ struct BoothmateSplashView: View {
             )
             .ignoresSafeArea()
 
-            Image("SplashLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 190, height: 190)
-                .clipShape(RoundedRectangle(cornerRadius: 42, style: .continuous))
-                .shadow(color: .black.opacity(0.18), radius: 22, y: 10)
-                .scaleEffect(appeared ? (pulse ? 1.04 : 1.0) : 0.78)
+            VStack(spacing: 30) {
+                Image("SplashLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 190, height: 190)
+                    .clipShape(RoundedRectangle(cornerRadius: 42, style: .continuous))
+                    .shadow(color: .black.opacity(0.18), radius: 22, y: 10)
+                    .scaleEffect(appeared ? (pulse ? 1.04 : 1.0) : 0.78)
+                    .opacity(appeared ? 1 : 0)
+
+                // 로딩 메시지 (순서대로 전환 + 점 애니메이션)
+                HStack(spacing: 9) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.85)
+                    Text(statusText)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.95))
+                        .frame(minWidth: 220, alignment: .leading)
+                }
                 .opacity(appeared ? 1 : 0)
+            }
         }
         .onAppear {
             // 튀어오르듯 등장
             withAnimation(.spring(response: 0.55, dampingFraction: 0.6)) { appeared = true }
             // 로딩 중 은은한 숨쉬기(펄스)
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true).delay(0.5)) { pulse = true }
+            startStatusAnimation()
+        }
+        .onDisappear {
+            dotTimer?.invalidate()
+            dotTimer = nil
+        }
+    }
+
+    private func startStatusAnimation() {
+        // 0.35초마다: 점(...) 애니메이션 + 약 1.4초마다 다음 메시지로 전환
+        dotTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { _ in
+            tickCount += 1
+            let idx = min(tickCount / 4, loadingMessages.count - 1)   // 마지막 메시지에서 멈춤
+            let dots = String(repeating: ".", count: tickCount % 4)   // 0~3개 반복
+            statusText = loadingMessages[idx] + dots
         }
     }
 }

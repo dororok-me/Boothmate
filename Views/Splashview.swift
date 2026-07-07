@@ -31,7 +31,7 @@ struct SplashView: View {
                 // 로고 영역
                 VStack(spacing: 16) {
                     VStack(spacing: 6) {
-                        Text("TEST123")
+                        Text("Boothmate")
                             .font(.system(size: 42, weight: .bold, design: .default))
                             .foregroundColor(.primary)
 
