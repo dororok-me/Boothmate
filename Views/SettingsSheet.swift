@@ -4,7 +4,8 @@ import SwiftUI
 struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    @AppStorage(StyleKey.fontSize)    private var fontSize: Double = 22
+    @AppStorage(StyleKey.srcFontSize)   private var srcFontSize: Double = 16
+    @AppStorage(StyleKey.transFontSize) private var transFontSize: Double = 22
     @AppStorage(StyleKey.lineSpacing) private var lineSpacing: Double = 3
     @AppStorage(StyleKey.pairGap)     private var pairGap: Double = 4
     @AppStorage(StyleKey.srcColor)    private var srcColorIdx: Int = 6
@@ -16,7 +17,8 @@ struct SettingsSheet: View {
         NavigationView {
             Form {
                 Section("글자") {
-                    stepper("글자 크기", $fontSize, range: 12...48, step: 2, suffix: "pt")
+                    stepper("원문 글자 크기", $srcFontSize, range: 10...40, step: 2, suffix: "pt")
+                    stepper("번역 글자 크기", $transFontSize, range: 12...48, step: 2, suffix: "pt")
                     stepper("줄 간격", $lineSpacing, range: 0...24, step: 1)
                     stepper("원문·번역 간격", $pairGap, range: 0...32, step: 2)
                 }
@@ -119,13 +121,13 @@ struct SettingsSheet: View {
         let bg = SubtitlePalette.bgEntry(bgIdx)
         return VStack(alignment: .leading, spacing: pairGap) {
             Text("올해 매출은 3천만 달러입니다.")
-                .font(.system(size: fontSize * 0.72))
+                .font(.system(size: srcFontSize))
                 .foregroundColor(SubtitlePalette.textColor(srcColorIdx, bgDark: bg.dark))
                 .lineSpacing(lineSpacing)
             Text(convEnabled
                  ? "This year's revenue is $30 million(₩약 402억원)."
                  : "This year's revenue is $30 million.")
-                .font(.system(size: fontSize, weight: .medium))
+                .font(.system(size: transFontSize, weight: .medium))
                 .foregroundColor(SubtitlePalette.textColor(transColorIdx, bgDark: bg.dark))
                 .lineSpacing(lineSpacing)
         }

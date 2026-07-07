@@ -2,7 +2,8 @@ import SwiftUI
 
 /// 자막 표시 설정 저장 키 (@AppStorage에서 공유).
 enum StyleKey {
-    static let fontSize    = "dispFontSize"
+    static let srcFontSize   = "dispSrcFontSize"
+    static let transFontSize = "dispTransFontSize"
     static let lineSpacing = "dispLineSpacing"
     static let pairGap     = "dispPairGap"
     static let srcColor    = "dispSrcColor"

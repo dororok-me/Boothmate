@@ -66,10 +66,15 @@ final class InterpreterViewModel: ObservableObject {
         }
     }
 
-    private func begin() {
+    /// 전사·번역 기록 초기화 (사용자가 🗑 누를 때).
+    func clearTranscript() {
         sourceText = ""
         translationText = ""
         convCache.removeAll(keepingCapacity: true)
+    }
+
+    private func begin() {
+        // 전사 기록은 지우지 않는다 — 정지 후에도 유지·누적. (초기화는 clearTranscript)
         currency.fetchRates()
         userStopped = false
         reconnectAttempts = 0

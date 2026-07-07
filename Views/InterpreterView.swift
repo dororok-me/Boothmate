@@ -6,34 +6,34 @@ struct InterpreterView: View {
     @AppStorage("dev_pass_key") private var devPassKey = ""
 
     // 표시 설정
-    @AppStorage(StyleKey.fontSize)    private var fontSize: Double = 22
-    @AppStorage(StyleKey.lineSpacing) private var lineSpacing: Double = 3
-    @AppStorage(StyleKey.pairGap)     private var pairGap: Double = 4
-    @AppStorage(StyleKey.srcColor)    private var srcColorIdx: Int = 6
-    @AppStorage(StyleKey.transColor)  private var transColorIdx: Int = 0
-    @AppStorage(StyleKey.bg)          private var bgIdx: Int = 0
-    @AppStorage(StyleKey.conv)        private var convEnabled: Bool = true
+    @AppStorage(StyleKey.srcFontSize)   private var srcFontSize: Double = 16
+    @AppStorage(StyleKey.transFontSize) private var transFontSize: Double = 22
+    @AppStorage(StyleKey.lineSpacing)   private var lineSpacing: Double = 3
+    @AppStorage(StyleKey.pairGap)       private var pairGap: Double = 4
+    @AppStorage(StyleKey.srcColor)      private var srcColorIdx: Int = 6
+    @AppStorage(StyleKey.transColor)    private var transColorIdx: Int = 0
+    @AppStorage(StyleKey.bg)            private var bgIdx: Int = 0
+    @AppStorage(StyleKey.conv)          private var convEnabled: Bool = true
 
     @State private var showSettings = false
     @State private var isFullscreen = false
 
     private var bgEntry: (name: String, color: Color, dark: Bool) { SubtitlePalette.bgEntry(bgIdx) }
-    private var screenBg: Color { vm.isRunning ? bgEntry.color : Color(.systemBackground) }
 
     var body: some View {
         ZStack {
-            screenBg.ignoresSafeArea()
+            (isFullscreen ? bgEntry.color : Color(.systemBackground)).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 if !isFullscreen {
                     header
                     Divider()
+                    menuBox
+                    Divider()
                 }
-                if vm.isRunning {
-                    subtitles
-                } else {
-                    setupPanel
-                }
+                subtitles
+                    .frame(maxHeight: .infinity)
+                    .background(isFullscreen ? Color.clear : bgEntry.color)
                 if let err = vm.errorText {
                     Text(err)
                         .font(.system(size: 12)).foregroundColor(.white)
@@ -58,13 +58,9 @@ struct InterpreterView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text("Boothmate").font(.system(size: 18, weight: .bold))
-            if vm.isRunning {
-                Text("\(vm.langA.label) ⇄ \(vm.langB.label)")
-                    .font(.system(size: 11)).foregroundColor(.secondary)
-                if vm.dirMode == .auto {
-                    Text("→ \(vm.curTarget.label)")
-                        .font(.system(size: 11, weight: .semibold)).foregroundColor(.blue)
-                }
+            if vm.isRunning, vm.dirMode == .auto {
+                Text("→ \(vm.curTarget.label)")
+                    .font(.system(size: 11, weight: .semibold)).foregroundColor(.blue)
             }
             Spacer()
             if let s = vm.secondsLeft {
@@ -89,77 +85,77 @@ struct InterpreterView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 시작 전 설정 (언어쌍 + 방향)
+    // MARK: - 메뉴 박스 (언어쌍 · 방향 · 초기화 · 통과키)
 
-    private var setupPanel: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("언어쌍").font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
-                HStack(spacing: 10) {
-                    langMenu(selection: $vm.langA)
-                    Image(systemName: "arrow.left.arrow.right").foregroundColor(.secondary)
-                    langMenu(selection: $vm.langB)
+    private var menuBox: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Group {
+                    langMenu($vm.langA)
+                    Image(systemName: "arrow.left.arrow.right").font(.system(size: 11)).foregroundColor(.secondary)
+                    langMenu($vm.langB)
+                    dirMenu
                 }
+                .disabled(vm.isRunning)   // 녹음 중 언어/방향 변경 방지
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("번역 방향").font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
-                    Picker("방향", selection: $vm.dirMode) {
-                        ForEach(DirMode.allCases) { m in
-                            Text(m.label(vm.langA, vm.langB)).tag(m)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    Text(dirHint).font(.system(size: 11)).foregroundColor(.secondary)
-                }
+                Spacer(minLength: 2)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("개발용 통과키 (임시 · P2에서 로그인으로 대체)")
-                        .font(.system(size: 12, weight: .medium)).foregroundColor(.secondary)
-                    SecureField("PASS_KEY", text: $devPassKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .padding(10)
-                        .background(Color.gray.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                Button { vm.clearTranscript() } label: {
+                    Image(systemName: "trash").font(.system(size: 14)).foregroundColor(.secondary)
+                        .frame(width: 30, height: 30)
                 }
+                .buttonStyle(.plain)
             }
-            .padding(16)
+
+            if !vm.isRunning {
+                SecureField("개발용 PASS_KEY (임시)", text: $devPassKey)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .font(.system(size: 13))
+                    .padding(8)
+                    .background(Color.gray.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
-    private func langMenu(selection: Binding<InterpretLanguage>) -> some View {
-        Picker("", selection: selection) {
-            ForEach(InterpretLanguage.all) { lang in
-                Text(lang.label).tag(lang)
-            }
+    private func langMenu(_ sel: Binding<InterpretLanguage>) -> some View {
+        Picker("", selection: sel) {
+            ForEach(InterpretLanguage.all) { Text($0.label).tag($0) }
         }
         .pickerStyle(.menu)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
-        .background(Color.gray.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .font(.system(size: 13))
     }
 
-    private var dirHint: String {
-        switch vm.dirMode {
-        case .auto: return "말하는 언어를 자동 인식해 양방향으로 번역합니다."
-        case .aToB: return "\(vm.langA.label) 음성만 \(vm.langB.label)(으)로 번역합니다."
-        case .bToA: return "\(vm.langB.label) 음성만 \(vm.langA.label)(으)로 번역합니다."
+    private var dirMenu: some View {
+        Picker("", selection: $vm.dirMode) {
+            ForEach(DirMode.allCases) { Text($0.label(vm.langA, vm.langB)).tag($0) }
         }
+        .pickerStyle(.menu)
+        .font(.system(size: 13))
     }
 
-    // MARK: - 자막 (문장마다 원문+번역 쌍)
+    // MARK: - 자막 (문장마다 원문+번역 쌍, 정지 후에도 유지)
 
     private var subtitles: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 let pairs = sentencePairs()
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(Array(pairs.enumerated()), id: \.offset) { item in
-                        segmentRow(source: item.element.0,
-                                   translation: item.element.1,
-                                   live: vm.isRunning && item.offset == pairs.count - 1)
-                            .id(item.offset)
+                    if pairs.isEmpty {
+                        Text(vm.isRunning ? "말해보세요…" : "‘시작’을 눌러 통역을 시작하세요")
+                            .font(.system(size: 14))
+                            .foregroundColor(SubtitlePalette.textColor(srcColorIdx, bgDark: bgEntry.dark).opacity(0.6))
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else {
+                        ForEach(Array(pairs.enumerated()), id: \.offset) { item in
+                            segmentRow(source: item.element.0,
+                                       translation: item.element.1,
+                                       live: vm.isRunning && item.offset == pairs.count - 1)
+                                .id(item.offset)
+                        }
                     }
                     Color.clear.frame(height: 1).id("bottom")
                 }
@@ -174,14 +170,14 @@ struct InterpreterView: View {
         VStack(alignment: .leading, spacing: pairGap) {
             if !source.isEmpty {
                 Text(source)
-                    .font(.system(size: fontSize * 0.72))
+                    .font(.system(size: srcFontSize))
                     .foregroundColor(SubtitlePalette.textColor(srcColorIdx, bgDark: bgEntry.dark))
                     .lineSpacing(lineSpacing)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if !translation.isEmpty {
                 Text(translation)
-                    .font(.system(size: fontSize, weight: .medium))
+                    .font(.system(size: transFontSize, weight: .medium))
                     .foregroundColor(SubtitlePalette.textColor(transColorIdx, bgDark: bgEntry.dark))
                     .lineSpacing(lineSpacing)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -222,7 +218,7 @@ struct InterpreterView: View {
         return result
     }
 
-    // MARK: - 전체화면 오버레이 (플로팅 컨트롤)
+    // MARK: - 전체화면 오버레이
 
     private var fullscreenOverlay: some View {
         VStack {
