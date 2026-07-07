@@ -20,8 +20,8 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		B7F7F4AAB0C06B7E66B559E2E7B88F7E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2CB74A84DF62E0DBFFA4715EF79E08A1 /* Foundation.framework */; };
 		BEE1E2322A141B8091865EAB12512D7B /* Pods-Boothmate-umbrella.h in Headers */ = {isa = PBXBuildFile; fileRef = 6561B201867DB057E6EC9144086C4908 /* Pods-Boothmate-umbrella.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		C6D8A3CAE0626A6F7151ACBB11391868 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 384DDA2CB25005BD6479B5987C619DD4 /* Foundation.framework */; };
 		F0363CCF805FC6D384C005A6CE4019D0 /* Pods-Boothmate-dummy.m in Sources */ = {isa = PBXBuildFile; fileRef = B64EF9E49CC78919776E51732CEE7D06 /* Pods-Boothmate-dummy.m */; };
 /* End PBXBuildFile section */
 
@@ -39,8 +39,8 @@
 		02B309B8666986AD9C9FB0221F1D6B5B /* MicrosoftCognitiveServicesSpeech-iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = "MicrosoftCognitiveServicesSpeech-iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		0D6240A3823DBF012C8F45C64F3D1089 /* Pods-Boothmate.modulemap */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.module; path = "Pods-Boothmate.modulemap"; sourceTree = "<group>"; };
 		20E7D47741E9687A4B92AA86FB54ADC4 /* Pods-Boothmate-frameworks.sh */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.script.sh; path = "Pods-Boothmate-frameworks.sh"; sourceTree = "<group>"; };
+		2CB74A84DF62E0DBFFA4715EF79E08A1 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		37551A341BF5AFCDA1E7EFD461572482 /* Pods-Boothmate */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; name = "Pods-Boothmate"; path = Pods_Boothmate.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		384DDA2CB25005BD6479B5987C619DD4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		3C2C15235C8D86720C315F8150511E63 /* MicrosoftCognitiveServicesSpeech-iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = "MicrosoftCognitiveServicesSpeech-iOS.release.xcconfig"; sourceTree = "<group>"; };
 		570E5DC5B994B249832618D1B4C2C2ED /* Pods-Boothmate.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = "Pods-Boothmate.debug.xcconfig"; sourceTree = "<group>"; };
 		58E27837BF8BDC6D6C90D733F67A3679 /* MicrosoftCognitiveServicesSpeech.xcframework */ = {isa = PBXFileReference; includeInIndex = 1; path = MicrosoftCognitiveServicesSpeech.xcframework; sourceTree = "<group>"; };
@@ -59,7 +59,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C6D8A3CAE0626A6F7151ACBB11391868 /* Foundation.framework in Frameworks */,
+				B7F7F4AAB0C06B7E66B559E2E7B88F7E /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -109,6 +109,14 @@
 			path = "MicrosoftCognitiveServicesSpeech-iOS";
 			sourceTree = "<group>";
 		};
+		7AECBA61365544F357B06DE1C8710425 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				2CB74A84DF62E0DBFFA4715EF79E08A1 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		931C5CDED088F9AE7EA013098F892B35 /* Support Files */ = {
 			isa = PBXGroup;
 			children = (
@@ -142,7 +150,7 @@
 		D210D550F4EA176C3123ED886F8F87F5 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				E4801F62A6B08CD9B5410329F1A18FDE /* iOS */,
+				7AECBA61365544F357B06DE1C8710425 /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -153,14 +161,6 @@
 				58E27837BF8BDC6D6C90D733F67A3679 /* MicrosoftCognitiveServicesSpeech.xcframework */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		E4801F62A6B08CD9B5410329F1A18FDE /* iOS */ = {
-			isa = PBXGroup;
-			children = (
-				384DDA2CB25005BD6479B5987C619DD4 /* Foundation.framework */,
-			);
-			name = iOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -215,7 +215,7 @@
 			);
 			mainGroup = CF1408CF629C7361332E53B88F7BD30C;
 			minimizedProjectReferenceProxies = 0;
-			preferredProjectObjectVersion = 77;
+			preferredProjectObjectVersion = 100;
 			productRefGroup = 3C029E046E70651C0C510C9B5ABD0078 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";

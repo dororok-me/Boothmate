@@ -20,21 +20,29 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0EB846D12F756DA700F12CAB /* Boothmate */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Boothmate;
 			sourceTree = "<group>";
 		};
 		0EF174C52F76B8C200E33D9A /* Models */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Models;
 			sourceTree = "<group>";
 		};
 		0EF174CA2F76B8D200E33D9A /* Utils */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Utils;
 			sourceTree = "<group>";
 		};
 		0EF174D42F76B8E100E33D9A /* Views */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Views;
 			sourceTree = "<group>";
 		};
@@ -193,13 +201,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Boothmate/Pods-Boothmate-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Boothmate/Pods-Boothmate-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
