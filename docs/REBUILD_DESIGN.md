@@ -37,7 +37,12 @@
 ### IAP 상품 (초안 — 가격은 App Store Connect에서 확정)
 - `com.dororok.Boothmate.pass.5h` — 5시간권 (Consumable)
 - `com.dororok.Boothmate.pass.10h` — 10시간권 (Consumable)
-- 무료 체험 30분은 IAP 아님(서버가 App Attest 검증 후 1회 부여).
+- 무료 체험 **1시간**은 IAP 아님(서버가 App Attest 검증 후 기기당 1회 부여).
+
+### 기존 구독 처리 (중요)
+- App Store Connect에 자동갱신 구독 그룹 **"Boothmate Pro"(구독 1건)**가 이미 존재 → v2.0에선 제공 안 함.
+- 기존 구독자 1명은 본인이 취소 전까지 계속 청구되므로 **App Store Connect에서 환불** 권장.
+- **"간소화된 구입(External Purchase)"이 현재 켜짐** → 순수 IAP 규정 준수를 위해 **끄기 검토**.
 
 > TODO: 실제 판매 금액 확정 → App Store Connect 상품 등록. 애플 최소 티어 ₩1,100부터. 선지불 API 원가 대비 15% 수수료 반영해 마진 계산.
 
@@ -67,7 +72,7 @@
 │  • Gemini Live 프록시 (키 서버 보관) — 있음                    │
 │  • 시간 차감 / time_up 푸시 — 있음                             │
 │  • [신규] IAP 영수증 검증(App Store Server API) → remainingSeconds 적립 │
-│  • [신규] App Attest 검증 → 무료 30분 1회 부여                 │
+│  • [신규] App Attest 검증 → 무료 1시간 1회 부여                 │
 │  • [신규] iOS용 ticket 발급(유저 인증 후)                      │
 │  • Firebase: users/{uid} (remainingSeconds, grade, glossaries) │
 └────────────────────────────────────────────────────────────┘
@@ -126,7 +131,7 @@ goAway                                    → 세션 곧 만료 → 재연결
 
 ## 5. 기능 & 화면
 
-1. **온보딩/로그인**: Sign in with Apple + 구글. 최초 App Attest → 무료 30분 부여.
+1. **온보딩/로그인**: Sign in with Apple + 구글. 최초 App Attest → 무료 1시간 부여.
 2. **메인(통역)**: 상단 원문 / 하단 번역 2단 자막 스크롤, 언어쌍·방향(자동/단방향) 선택, 시작·정지, **잔여시간 배지**, 전체보기, 폰트·테마.
 3. **시간권 구매**: 5h/10h IAP, 현재 잔여시간, 구매 내역.
 4. **글로서리**: 양방향 용어 추가/편집, CSV/Excel 입출력, **클라우드 동기화**(Firebase). 전 등급 개방.
@@ -159,7 +164,7 @@ goAway                                    → 세션 곧 만료 → 재연결
 ```
 users/{uid}/
   profile:          { email, name, createdAt, authProvider }
-  remainingSeconds: 1800                      // 무료=30분
+  remainingSeconds: 3600                      // 무료=1시간
   trialGranted:     true                      // App Attest로 기기당 1회
   glossaries/{gid}: { eventName, date, entries:[{a,b,synA,synB}], updatedAt }
   purchases/{pid}:  { productId, transactionId, seconds, ts }   // IAP 검증 결과
@@ -170,10 +175,12 @@ users/{uid}/
 
 ## 8. 앱스토어 제출 요건 & 보존 식별자
 
-### 반드시 보존 (기존 리스팅 업데이트)
-- **Bundle ID**: `com.dororok.Boothmate` (변경 금지)
+### 반드시 보존 (기존 리스팅 업데이트) — App Store Connect 실측값
+- **표시명**: BoothmatePro · **Apple ID**: `6761739093` · **SKU**: `com.dororok.Boothmate`
+- **Bundle ID**: `com.dororok.Boothmate` (변경 금지, 확인됨)
 - **Team**: `7WHUP4PG44`
-- **버전 상향**: `MARKETING_VERSION 1.0 → 2.0`, `CURRENT_PROJECT_VERSION(build) 1 → 2`
+- **카테고리**: 비즈니스(주)/생산성(부) · **연령**: 4+ · **기준가 통화**: USD · **175개국**
+- **현재 배포 준비 버전 `1.0.2`** → v2.0은 **`MARKETING_VERSION 2.0.0` 이상 + build 상향** (1.0.2보다 높아야 함)
 
 ### 프로젝트 정비
 - **CocoaPods 제거**: Azure 팟(`MicrosoftCognitiveServicesSpeech`) 불필요 → `Podfile`/`Pods/`/`.xcworkspace` 삭제, `.xcodeproj` 직접 사용.
@@ -185,7 +192,7 @@ users/{uid}/
 ### App Store Connect / 리뷰 노트
 - **App Privacy(영양성분표)**: 오디오가 Google(Gemini)로 전송됨을 명시. 개인정보/약관 URL(웹의 `privacy.html`/`terms.html` 활용).
 - **IAP 상품** 2종 등록 + 심사 첨부.
-- **리뷰어 데모 계정** 또는 무료 30분으로 기능 시연 가능하게.
+- **리뷰어 데모 계정** 또는 무료 1시간으로 기능 시연 가능하게.
 - **수출 규정(Export Compliance)**: HTTPS/WSS만 사용 → 표준 암호화 예외 신고.
 
 ---
@@ -196,7 +203,7 @@ users/{uid}/
 - **P1 통역 코어**: AVAudioEngine 16kHz 캡처 → WS(setup/realtimeInput) → 2단 자막 수신. (개발 중엔 베타 통과키로 로컬 검증)
 - **P2 인증·티켓**: Sign in with Apple + 구글(Firebase) → 서버 티켓 발급 → 티켓 방식 연결.
 - **P3 시간권 IAP**: StoreKit2 소비형 구매 → 백엔드 영수증 검증 → `remainingSeconds` 적립 → 배지/`time_up` 처리.
-- **P4 무료체험**: App Attest → 서버 30분 1회 부여.
+- **P4 무료체험**: App Attest → 서버 1시간 1회 부여.
 - **P5 글로서리/환율/도량형**: 로직 이식 + Firebase 동기화.
 - **P6 제출**: 프라이버시/스크린샷/버전 상향/리뷰노트 → 심사.
 
