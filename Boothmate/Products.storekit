@@ -1,0 +1,43 @@
+{
+  "identifier" : "BM-STOREKIT-TEST",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "10000001",
+      "localizations" : [
+        {
+          "description" : "5 hours of live interpretation",
+          "displayName" : "5-Hour Pass",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.dororok.Boothmate.pass5h",
+      "referenceName" : "5-Hour Pass",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "17.99",
+      "familyShareable" : false,
+      "internalID" : "10000002",
+      "localizations" : [
+        {
+          "description" : "10 hours of live interpretation",
+          "displayName" : "10-Hour Pass",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.dororok.Boothmate.pass10h",
+      "referenceName" : "10-Hour Pass",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

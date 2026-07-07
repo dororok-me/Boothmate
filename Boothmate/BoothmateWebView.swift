@@ -48,6 +48,7 @@ struct BoothmateSplashView: View {
 struct BoothmateRootView: View {
     @StateObject private var loadState = WebLoadState()
     @StateObject private var signIn = SignInManager()
+    @State private var showPaywall = false
 
     var body: some View {
         ZStack {
@@ -61,9 +62,29 @@ struct BoothmateRootView: View {
                 BoothmateSplashView()                  // 로그인 후·로딩 중: 스플래시
                     .transition(.opacity)
             }
+
+            // [임시 테스트] 시간권 구매 화면 여는 버튼. 나중에 실제 '충전' 흐름으로 교체.
+            if signIn.user != nil && loadState.ready {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button { showPaywall = true } label: {
+                            Text("🛒 시간권(테스트)")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12).padding(.vertical, 8)
+                                .background(Color.black.opacity(0.55))
+                                .clipShape(Capsule())
+                        }
+                        .padding(.trailing, 14).padding(.bottom, 30)
+                    }
+                }
+            }
         }
         .animation(.easeInOut(duration: 0.4), value: loadState.ready)
         .animation(.easeInOut(duration: 0.4), value: signIn.user)
+        .sheet(isPresented: $showPaywall) { TimePassPaywallView() }
         .onAppear {
             // 폴백: 준비 신호가 안 와도 최대 15초 후엔 스플래시 해제
             DispatchQueue.main.asyncAfter(deadline: .now() + 15) { loadState.ready = true }
