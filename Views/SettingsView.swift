@@ -1,13 +1,8 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var speechManager: SpeechManager
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
-
-    @State private var showGlossaryList = false
-    @State private var showPaywall = false
 
     var body: some View {
         NavigationView {
@@ -15,9 +10,7 @@ struct SettingsView: View {
                 languageSection
                 fontSection
                 themeSection
-                glossarySection
-                exportSection
-                subscriptionSection
+                conversionSection
                 aboutSection
             }
             .navigationTitle("Settings")
@@ -28,15 +21,6 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
-            }
-            // ✅ 모든 sheet를 여기 한 곳에 모음
-            .sheet(isPresented: $showGlossaryList) {
-                if let store = speechManager.glossaryStore {
-                    GlossaryView(glossaryStore: store)
-                }
-            }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
             }
         }
     }
@@ -51,13 +35,6 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             .onChange(of: speechManager.selectedBooth) { _, newBooth in
                 speechManager.selectedLanguage = newBooth.defaultLanguage
-                let boothLanguage: String
-                switch newBooth {
-                case .kr: boothLanguage = "en-US"
-                case .cn: boothLanguage = "zh-CN"
-                case .jp: boothLanguage = "ja-JP"
-                }
-                NotificationCenter.default.post(name: .boothChanged, object: boothLanguage)
             }
         }
     }
@@ -130,103 +107,9 @@ struct SettingsView: View {
         }
     }
 
-    private var glossarySection: some View {
-        Section("Glossary") {
-            Toggle("Glossary On/Off", isOn: $speechManager.glossaryEnabled)
-            Toggle("Unit Conversion On/Off", isOn: $speechManager.unitConversionEnabled)
-
-            Button {
-                showGlossaryList = true
-            } label: {
-                HStack {
-                    Image(systemName: "text.book.closed")
-                    Text("Edit Glossary")
-                }
-            }
-
-            if speechManager.glossaryEnabled {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Glossary color")
-                        .font(.subheadline)
-
-                    HStack(spacing: 12) {
-                        ForEach(GlossaryColor.allCases) { color in
-                            Button {
-                                speechManager.glossaryColor = color
-                            } label: {
-                                ZStack {
-                                    Circle()
-                                        .fill(color.color)
-                                        .frame(width: 32, height: 32)
-
-                                    if speechManager.glossaryColor == color {
-                                        Circle()
-                                            .stroke(Color.primary, lineWidth: 2.5)
-                                            .frame(width: 38, height: 38)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.vertical, 4)
-
-                    Text("example(\(speechManager.glossaryColor.label))")
-                        .font(.system(size: speechManager.fontSize, weight: .medium))
-                        .foregroundColor(speechManager.glossaryColor.color)
-                        .padding(.top, 4)
-                }
-            }
-        }
-    }
-
-    private var exportSection: some View {
-        Section("Export Subtitles") {
-            if subscriptionManager.isSubscribed {
-                Button {
-                    shareSubtitles()
-                } label: {
-                    HStack {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("Export Subtitles")
-                    }
-                }
-                .disabled(speechManager.allSubtitles.isEmpty)
-
-                Text("총 \(speechManager.allSubtitles.count)줄 저장됨")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-            } else {
-                HStack {
-                    Image(systemName: "lock.fill")
-                        .foregroundColor(.secondary)
-                    Text("Only for subscribers")
-                        .foregroundColor(.secondary)
-                }
-
-                Button {
-                    showPaywall = true
-                } label: {
-                    Text("Upgrade to Pro")
-                        .foregroundColor(.accentColor)
-                }
-            }
-        }
-    }
-
-    private var subscriptionSection: some View {
-        // ✅ .sheet 제거됨 (NavigationView 레벨로 올림)
-        Section("Subscription") {
-            Button {
-                showPaywall = true
-            } label: {
-                HStack {
-                    Image(systemName: "crown.fill")
-                        .foregroundColor(.yellow)
-                    Text("Subscribe to Boothmate Pro")
-                        .foregroundColor(.primary)
-                }
-            }
+    private var conversionSection: some View {
+        Section("Conversion") {
+            Toggle("실시간 환율·단위 변환", isOn: $speechManager.unitConversionEnabled)
         }
     }
 
@@ -242,43 +125,6 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity)
             .listRowBackground(Color.clear)
-        }
-    }
-
-    private func shareSubtitles() {
-        let text = speechManager.exportAllSubtitles()
-        guard !text.isEmpty else { return }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("subtitles.txt")
-
-        try? text.data(using: .utf8)?.write(to: fileURL)
-
-        let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
-
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
-
-        var topVC = rootVC
-        while let presented = topVC.presentedViewController {
-            topVC = presented
-        }
-
-        if let popover = activityVC.popoverPresentationController {
-            popover.sourceView = topVC.view
-            popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
-        }
-
-        topVC.present(activityVC, animated: true)
-    }
-
-    private func displayLanguageName(for code: String) -> String {
-        switch code {
-        case "en-US": return "English"
-        case "ko-KR": return "한국어"
-        case "ja-JP": return "日本語"
-        case "zh-CN": return "中文"
-        default: return code
         }
     }
 }

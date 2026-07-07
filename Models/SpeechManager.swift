@@ -4,36 +4,6 @@ import AVFoundation
 import SwiftUI
 import Combine
 
-// MARK: - Glossary Color
-
-enum GlossaryColor: String, CaseIterable, Identifiable {
-    case orange = "Orange"
-    case blue = "Blue"
-    case green = "Green"
-    case red = "Red"
-    case purple = "Purple"
-    
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .orange: return "주황"
-        case .blue: return "파랑"
-        case .green: return "초록"
-        case .red: return "빨강"
-        case .purple: return "보라"
-        }
-    }
-    var color: Color {
-        switch self {
-        case .orange: return .orange
-        case .blue: return .blue
-        case .green: return .green
-        case .red: return .red
-        case .purple: return .purple
-        }
-    }
-}
-
 // MARK: - Subtitle Theme
 
 enum SubtitleTheme: String, CaseIterable, Identifiable {
@@ -120,8 +90,6 @@ class SpeechManager: ObservableObject {
     @Published var lineSpacing: CGFloat = 8
     @Published var selectedTheme: SubtitleTheme = .normal
     @Published var elapsedSeconds: Int = 0
-    @Published var glossaryEnabled: Bool = true
-    @Published var glossaryColor: GlossaryColor = .orange
     @Published var unitConversionEnabled: Bool = true
     @Published var selectedBooth: BoothMode = .kr
     
@@ -135,7 +103,6 @@ class SpeechManager: ObservableObject {
     // MARK: - Storage
     
     var allSubtitles: [String] = []
-    weak var glossaryStore: GlossaryStore?
     var currencyConverter: CurrencyConverter?
     
     // MARK: - Private Properties
@@ -200,8 +167,7 @@ class SpeechManager: ObservableObject {
         guard now.timeIntervalSince(lastUpdateTime) > 0.1 else { return }
         lastUpdateTime = now
 
-        var displayed = applyGlossary(to: rawText)
-        displayed = applyConversions(to: displayed)
+        let displayed = applyConversions(to: rawText)
 
         guard displayed != self.currentText else { return }
         self.currentText = displayed
@@ -213,8 +179,7 @@ class SpeechManager: ObservableObject {
     // MARK: - 확정 자막 처리
     
     private func processFinalText(_ rawText: String) {
-        var processed = applyGlossary(to: rawText)
-        processed = applyConversions(to: processed)
+        let processed = applyConversions(to: rawText)
         self.currentText = processed
         
         if !self.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -353,8 +318,7 @@ class SpeechManager: ObservableObject {
         
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
-            var processed = applyGlossary(to: trimmed)
-            processed = applyConversions(to: processed)
+            let processed = applyConversions(to: trimmed)
             allSubtitles.append(processed)
             subtitles.append(processed)
             if subtitles.count > maxDisplayLines {
@@ -450,8 +414,7 @@ class SpeechManager: ObservableObject {
         
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
-            var processed = applyGlossary(to: currentText)
-            processed = applyConversions(to: processed)
+            let processed = applyConversions(to: currentText)
             allSubtitles.append(processed)
             subtitles.append(processed)
             if subtitles.count > maxDisplayLines {
@@ -460,70 +423,12 @@ class SpeechManager: ObservableObject {
         }
         currentText = ""
     }
-    
+
     // MARK: - Subtitles Management
-    
-    func exportAllSubtitles() -> String { allSubtitles.joined(separator: "\n") }
 
     func clearSubtitles() {
         subtitles.removeAll()
         allSubtitles.removeAll()
         currentText = ""
-    }
-    
-    // MARK: - Glossary
-
-    private func applyGlossary(to text: String) -> String {
-        guard glossaryEnabled else { return text }
-        guard let glossaryStore = glossaryStore else { return text }
-        guard !glossaryStore.entries.isEmpty else { return text }
-
-        var output = text
-        let sortedEntries = glossaryStore.entries.sorted {
-            max($0.source.count, $0.target.count) > max($1.source.count, $1.target.count)
-        }
-
-        for entry in sortedEntries {
-            let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
-            let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !source.isEmpty, !target.isEmpty else { continue }
-
-            if output.localizedCaseInsensitiveContains("〔\(source)") ||
-               output.localizedCaseInsensitiveContains("〔\(target)") { continue }
-
-            let sourceNoSpace = source.replacingOccurrences(of: " ", with: "")
-            let targetNoSpace = target.replacingOccurrences(of: " ", with: "")
-
-            func findAndReplace(searchTerm: String, displayTerm: String, annotation: String) -> Bool {
-                let searchNoSpace = searchTerm.replacingOccurrences(of: " ", with: "")
-                if output.localizedCaseInsensitiveContains("〔\(displayTerm)") { return false }
-                if output.localizedCaseInsensitiveContains(searchTerm) {
-                    output = output.replacingOccurrences(of: searchTerm,
-                        with: "〔\(displayTerm)(\(annotation))〕", options: .caseInsensitive)
-                    return true
-                }
-                if searchNoSpace != searchTerm && output.localizedCaseInsensitiveContains(searchNoSpace) {
-                    output = output.replacingOccurrences(of: searchNoSpace,
-                        with: "〔\(displayTerm)(\(annotation))〕", options: .caseInsensitive)
-                    return true
-                }
-                return false
-            }
-
-            if findAndReplace(searchTerm: source, displayTerm: source, annotation: target) { continue }
-            if findAndReplace(searchTerm: target, displayTerm: target, annotation: source) { continue }
-            if sourceNoSpace != source &&
-               findAndReplace(searchTerm: sourceNoSpace, displayTerm: source, annotation: target) { continue }
-            if targetNoSpace != target &&
-               findAndReplace(searchTerm: targetNoSpace, displayTerm: target, annotation: source) { continue }
-
-            for synonym in entry.synonyms {
-                let syn = synonym.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !syn.isEmpty else { continue }
-                if findAndReplace(searchTerm: syn, displayTerm: syn, annotation: source) { break }
-            }
-        }
-
-        return output
     }
 }
