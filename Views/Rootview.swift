@@ -6,7 +6,7 @@ struct RootView: View {
     var body: some View {
         ZStack {
             // 메인 앱
-            ContentView()
+            InterpreterView()
                 .opacity(splashFinished ? 1 : 0)
 
             // 스플래시
