@@ -1,30 +1,56 @@
 import SwiftUI
 
-/// 통역 메인 화면 (P1.5 — 언어쌍 + 방향 자동/수동).
+/// 통역 메인 화면.
 struct InterpreterView: View {
     @StateObject private var vm = InterpreterViewModel()
     @AppStorage("dev_pass_key") private var devPassKey = ""
 
+    // 표시 설정
+    @AppStorage(StyleKey.fontSize)    private var fontSize: Double = 22
+    @AppStorage(StyleKey.lineSpacing) private var lineSpacing: Double = 3
+    @AppStorage(StyleKey.pairGap)     private var pairGap: Double = 4
+    @AppStorage(StyleKey.srcColor)    private var srcColorIdx: Int = 6
+    @AppStorage(StyleKey.transColor)  private var transColorIdx: Int = 0
+    @AppStorage(StyleKey.bg)          private var bgIdx: Int = 0
+    @AppStorage(StyleKey.conv)        private var convEnabled: Bool = true
+
+    @State private var showSettings = false
+    @State private var isFullscreen = false
+
+    private var bgEntry: (name: String, color: Color, dark: Bool) { SubtitlePalette.bgEntry(bgIdx) }
+    private var screenBg: Color { vm.isRunning ? bgEntry.color : Color(.systemBackground) }
+
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            if vm.isRunning {
-                subtitles
-            } else {
-                setupPanel
+        ZStack {
+            screenBg.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                if !isFullscreen {
+                    header
+                    Divider()
+                }
+                if vm.isRunning {
+                    subtitles
+                } else {
+                    setupPanel
+                }
+                if let err = vm.errorText {
+                    Text(err)
+                        .font(.system(size: 12)).foregroundColor(.white)
+                        .padding(8).frame(maxWidth: .infinity)
+                        .background(Color.red.opacity(0.85))
+                }
+                if !isFullscreen {
+                    controlBar
+                }
             }
-            if let err = vm.errorText {
-                Text(err)
-                    .font(.system(size: 12))
-                    .foregroundColor(.white)
-                    .padding(8)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.red.opacity(0.85))
+
+            if isFullscreen && vm.isRunning {
+                fullscreenOverlay
             }
-            controlBar
         }
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .sheet(isPresented: $showSettings) { SettingsSheet() }
+        .onAppear { vm.currency.fetchRates() }
     }
 
     // MARK: - 헤더
@@ -34,12 +60,10 @@ struct InterpreterView: View {
             Text("Boothmate").font(.system(size: 18, weight: .bold))
             if vm.isRunning {
                 Text("\(vm.langA.label) ⇄ \(vm.langB.label)")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11)).foregroundColor(.secondary)
                 if vm.dirMode == .auto {
                     Text("→ \(vm.curTarget.label)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.blue)
+                        .font(.system(size: 11, weight: .semibold)).foregroundColor(.blue)
                 }
             }
             Spacer()
@@ -48,9 +72,21 @@ struct InterpreterView: View {
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundColor(s < 300 ? .red : .secondary)
             }
+            if vm.isRunning {
+                iconButton("arrow.up.left.and.arrow.down.right") { withAnimation { isFullscreen = true } }
+            }
+            iconButton("gearshape") { showSettings = true }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+    }
+
+    private func iconButton(_ name: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name).font(.system(size: 15, weight: .semibold)).foregroundColor(.secondary)
+                .frame(width: 30, height: 30)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 시작 전 설정 (언어쌍 + 방향)
@@ -58,9 +94,7 @@ struct InterpreterView: View {
     private var setupPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-
-                Text("언어쌍")
-                    .font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
+                Text("언어쌍").font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
                 HStack(spacing: 10) {
                     langMenu(selection: $vm.langA)
                     Image(systemName: "arrow.left.arrow.right").foregroundColor(.secondary)
@@ -68,16 +102,14 @@ struct InterpreterView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("번역 방향")
-                        .font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
+                    Text("번역 방향").font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
                     Picker("방향", selection: $vm.dirMode) {
                         ForEach(DirMode.allCases) { m in
                             Text(m.label(vm.langA, vm.langB)).tag(m)
                         }
                     }
                     .pickerStyle(.menu)
-                    Text(dirHint)
-                        .font(.system(size: 11)).foregroundColor(.secondary)
+                    Text(dirHint).font(.system(size: 11)).foregroundColor(.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -116,7 +148,7 @@ struct InterpreterView: View {
         }
     }
 
-    // MARK: - 자막 (문장마다 원문+번역 쌍으로 누적)
+    // MARK: - 자막 (문장마다 원문+번역 쌍)
 
     private var subtitles: some View {
         ScrollViewReader { proxy in
@@ -138,7 +170,27 @@ struct InterpreterView: View {
         }
     }
 
-    /// 원문/번역을 각각 문장으로 나눠 인덱스로 짝지어 쌍을 만든다. (최근 40개만)
+    private func segmentRow(source: String, translation: String, live: Bool) -> some View {
+        VStack(alignment: .leading, spacing: pairGap) {
+            if !source.isEmpty {
+                Text(source)
+                    .font(.system(size: fontSize * 0.72))
+                    .foregroundColor(SubtitlePalette.textColor(srcColorIdx, bgDark: bgEntry.dark))
+                    .lineSpacing(lineSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !translation.isEmpty {
+                Text(translation)
+                    .font(.system(size: fontSize, weight: .medium))
+                    .foregroundColor(SubtitlePalette.textColor(transColorIdx, bgDark: bgEntry.dark))
+                    .lineSpacing(lineSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .opacity(live ? 0.6 : 1)
+    }
+
+    /// 원문/번역을 문장으로 나눠 인덱스로 짝짓고, 번역엔 환율·도량형 병기.
     private func sentencePairs() -> [(String, String)] {
         let src = Self.sentences(vm.sourceText)
         let trg = Self.sentences(vm.translationText)
@@ -146,12 +198,14 @@ struct InterpreterView: View {
         guard n > 0 else { return [] }
         var out: [(String, String)] = []
         for i in 0..<n {
-            out.append((i < src.count ? src[i] : "", i < trg.count ? trg[i] : ""))
+            let s = i < src.count ? src[i] : ""
+            var t = i < trg.count ? trg[i] : ""
+            if convEnabled, !t.isEmpty { t = vm.converted(t) }
+            out.append((s, t))
         }
         return out.count > 40 ? Array(out.suffix(40)) : out
     }
 
-    /// 문장 종결부호(. ! ? 。 ！ ？ …) 기준으로 문장 분리.
     static func sentences(_ text: String) -> [String] {
         var result: [String] = []
         var current = ""
@@ -168,29 +222,30 @@ struct InterpreterView: View {
         return result
     }
 
-    /// 한 문장 = 원문(작게, 보조색) + 번역(크게, 강조) 한 쌍.
-    private func segmentRow(source: String, translation: String, live: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if !source.isEmpty {
-                Text(source)
-                    .font(.system(size: 15))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+    // MARK: - 전체화면 오버레이 (플로팅 컨트롤)
+
+    private var fullscreenOverlay: some View {
+        VStack {
+            HStack(spacing: 10) {
+                Spacer()
+                floatButton("arrow.down.right.and.arrow.up.left") { withAnimation { isFullscreen = false } }
+                floatButton("stop.fill", tint: .red) { vm.stop(); isFullscreen = false }
             }
-            if !translation.isEmpty {
-                Text(translation)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            Spacer()
         }
-        .padding(.leading, 10)
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.blue.opacity(live ? 0.35 : 0.6))
-                .frame(width: 3)
+        .padding(16)
+    }
+
+    private func floatButton(_ name: String, tint: Color = .white, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(tint)
+                .padding(10)
+                .background(Color.black.opacity(0.35))
+                .clipShape(Circle())
         }
-        .opacity(live ? 0.6 : 1)
+        .buttonStyle(.plain)
     }
 
     // MARK: - 컨트롤 바

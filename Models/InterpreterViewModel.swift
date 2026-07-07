@@ -25,9 +25,22 @@ final class InterpreterViewModel: ObservableObject {
     private let audio = AudioCapture()
     private let relay = RelayClient()
 
+    // 자막 환율·도량형 변환 (결과 캐시 — 완료된 문장 재계산 방지)
+    let currency = CurrencyConverter()
+    private var convCache: [String: String] = [:]
+
     private var passKey = ""
     private var userStopped = false
     private var reconnectAttempts = 0
+
+    /// 문장에 환율·도량형 환산값을 괄호로 병기 (캐시 사용).
+    func converted(_ s: String) -> String {
+        if let c = convCache[s] { return c }
+        let out = UnitConverter.applyConversion(to: currency.applyConversion(to: s))
+        if convCache.count > 400 { convCache.removeAll(keepingCapacity: true) }
+        convCache[s] = out
+        return out
+    }
 
     init() {
         let relay = self.relay
@@ -56,6 +69,8 @@ final class InterpreterViewModel: ObservableObject {
     private func begin() {
         sourceText = ""
         translationText = ""
+        convCache.removeAll(keepingCapacity: true)
+        currency.fetchRates()
         userStopped = false
         reconnectAttempts = 0
         curTarget = defaultTarget()
