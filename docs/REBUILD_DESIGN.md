@@ -159,17 +159,16 @@ goAway                                    → 세션 곧 만료 → 재연결
 
 ---
 
-## 7. 데이터 모델 (Firebase, POLICY_SPEC 기반)
+## 7. 데이터 모델 (역할 분리)
 
-```
-users/{uid}/
-  profile:          { email, name, createdAt, authProvider }
-  remainingSeconds: 3600                      // 무료=1시간
-  trialGranted:     true                      // App Attest로 기기당 1회
-  glossaries/{gid}: { eventName, date, entries:[{a,b,synA,synB}], updatedAt }
-  purchases/{pid}:  { productId, transactionId, seconds, ts }   // IAP 검증 결과
-```
-- 웹의 `grade`/lock-in/토스/휴대폰 필드는 iOS에선 단순화: 글로서리 전면 개방, 결제는 IAP 단위.
+- **Firebase = 로그인(Auth) 전용** — 프로젝트 `dororokrealtimespeech`. Apple/Google로 인증, ID 토큰의 `email`을 `user_id`로 사용. (Firestore/RTDB에 앱 데이터 저장 안 함)
+- **Turso(relay 서버) = 실제 데이터** — 시간 잔액과 글로서리를 서버가 보관:
+  - `user_balance(user_id, seconds_left)` — 잔여시간(기존)
+  - `relay_ticket(...)` — 단기 티켓(기존)
+  - `purchase(transaction_id, user_id, product_id, seconds, ts)` — IAP 멱등(신규)
+  - `trial_device(key_id, user_id, granted_at)` — App Attest 무료 1회(신규)
+  - 글로서리: 서버 `GET/PUT /glossary`(Turso, 이미 구현 v3.2.0)
+- 웹의 `grade`/lock-in/토스/휴대폰 필드는 iOS에선 단순화: 글로서리 전면 개방, 결제는 IAP 소비형.
 
 ---
 
@@ -236,7 +235,7 @@ users/{uid}/
 | 메서드/경로 | 인증 | 동작 |
 |---|---|---|
 | `POST /ticket` | Firebase | `seconds_left>0` 확인 → `relay_ticket`(UUID, 만료 5분, used=0) 생성 → `{ticket, secondsLeft}`. 0이면 402 `no_time`. **← Vercel 발급 대체** |
-| `POST /iap/verify` | Firebase | body `{jws|transactionId}` → **App Store Server API**로 검증 → `productId→seconds` 매핑 → `purchase` 테이블 멱등 기록 → `user_balance += seconds` → `{secondsLeft}` |
+| `POST /iap/verify` | Firebase | body `{jws}` → **StoreKit2 서명거래(JWS)를 Apple 루트 인증서로 서버 검증**(키 불필요) → `productId→seconds` 매핑 → `purchase` 테이블 멱등 기록 → `user_balance += seconds` → `{secondsLeft}`. (환불회수/서버알림 필요 시 App Store Server API 추가) |
 | `POST /trial/claim` | Firebase | body App Attest attestation/assertion+keyId → 검증 → `trial_device`에 keyId 없으면 **+3600초 1회** → `{secondsLeft, granted}` |
 
 ### 스키마 추가 (schema.sql)
@@ -260,9 +259,11 @@ CREATE TABLE IF NOT EXISTS trial_device (
 - `com.dororok.Boothmate.pass.5h` → 18000초 · `com.dororok.Boothmate.pass.10h` → 36000초 · 무료체험 3600초.
 
 ### Railway 환경변수 (신규)
-`FIREBASE_PROJECT_ID`, `APPSTORE_ISSUER_ID`, `APPSTORE_KEY_ID`, `APPSTORE_PRIVATE_KEY`(.p8), `APPSTORE_BUNDLE_ID=com.dororok.Boothmate`, `APPLE_TEAM_ID=7WHUP4PG44`. (기존 `GEMINI_API_KEY`, `TURSO_URL` 유지)
+- **필수**: `FIREBASE_PROJECT_ID=dororokrealtimespeech`, `APPSTORE_BUNDLE_ID=com.dororok.Boothmate`, `APPLE_TEAM_ID=7WHUP4PG44`. (기존 `GEMINI_API_KEY`, `TURSO_URL` 유지)
+- **선택**(환불회수/서버알림 쓸 때만): `APPSTORE_ISSUER_ID`, `APPSTORE_KEY_ID`, `APPSTORE_PRIVATE_KEY`(.p8).
+- IAP 기본 검증은 App Store Server API 키 없이 **JWS 로컬 검증**(Apple 루트 인증서 번들)으로 처리 → 별도 키 발급 불필요.
 
 ### 구현 시 필요한 준비물 (값은 env로 주입 → 코드엔 비밀 없음)
-- Firebase 프로젝트 ID (+ Apple/Google 로그인 활성화).
-- App Store Connect **App Store Server API 키**(Issuer ID / Key ID / .p8) — 서버측 영수증 검증용.
+- Firebase 프로젝트 **`dororokrealtimespeech`** (확인됨) — Authentication에서 **Apple·Google provider 활성화** + iOS 앱(`com.dororok.Boothmate`) 등록 → `GoogleService-Info.plist`.
+- App Store Server API 키는 **불필요**(JWS 로컬 검증). 환불회수/서버알림 원할 때만 App Store Connect → 통합 → **앱 내 구입 키** 생성.
 - 5h/10h 가격 확정(시간 매핑은 위 기본안).
