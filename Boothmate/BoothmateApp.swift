@@ -6,7 +6,7 @@ struct BoothmateApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            BoothmateRootView()
                 .preferredColorScheme(.light)
                 .onAppear {
                     UIApplication.shared.isIdleTimerDisabled = true

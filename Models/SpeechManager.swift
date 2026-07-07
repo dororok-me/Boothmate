@@ -497,15 +497,32 @@ class SpeechManager: ObservableObject {
             func findAndReplace(searchTerm: String, displayTerm: String, annotation: String) -> Bool {
                 let searchNoSpace = searchTerm.replacingOccurrences(of: " ", with: "")
                 if output.localizedCaseInsensitiveContains("〔\(displayTerm)") { return false }
-                if output.localizedCaseInsensitiveContains(searchTerm) {
-                    output = output.replacingOccurrences(of: searchTerm,
-                        with: "〔\(displayTerm)(\(annotation))〕", options: .caseInsensitive)
-                    return true
+                
+                // ★ bugfix: word boundary(\b) 정규식으로 부분 문자열 오매칭 방지
+                let escaped = NSRegularExpression.escapedPattern(for: searchTerm)
+                let pattern = "\\b\(escaped)\\b"
+                if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                    let range = NSRange(output.startIndex..., in: output)
+                    if regex.firstMatch(in: output, range: range) != nil {
+                        output = regex.stringByReplacingMatches(
+                            in: output, range: range,
+                            withTemplate: "〔\(displayTerm)(\(annotation))〕")
+                        return true
+                    }
                 }
-                if searchNoSpace != searchTerm && output.localizedCaseInsensitiveContains(searchNoSpace) {
-                    output = output.replacingOccurrences(of: searchNoSpace,
-                        with: "〔\(displayTerm)(\(annotation))〕", options: .caseInsensitive)
-                    return true
+                
+                if searchNoSpace != searchTerm {
+                    let escapedNoSpace = NSRegularExpression.escapedPattern(for: searchNoSpace)
+                    let patternNoSpace = "\\b\(escapedNoSpace)\\b"
+                    if let regex = try? NSRegularExpression(pattern: patternNoSpace, options: .caseInsensitive) {
+                        let range = NSRange(output.startIndex..., in: output)
+                        if regex.firstMatch(in: output, range: range) != nil {
+                            output = regex.stringByReplacingMatches(
+                                in: output, range: range,
+                                withTemplate: "〔\(displayTerm)(\(annotation))〕")
+                            return true
+                        }
+                    }
                 }
                 return false
             }

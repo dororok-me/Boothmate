@@ -8,6 +8,7 @@ struct SettingsView: View {
 
     @State private var showGlossaryList = false
     @State private var showPaywall = false
+    @State private var showAzureAlert = false
 
     var body: some View {
         NavigationView {
@@ -16,6 +17,7 @@ struct SettingsView: View {
                 fontSection
                 themeSection
                 glossarySection
+                azureSection
                 exportSection
                 subscriptionSection
                 aboutSection
@@ -180,37 +182,83 @@ struct SettingsView: View {
         }
     }
 
-    private var exportSection: some View {
-        Section("Export Subtitles") {
-            if subscriptionManager.isSubscribed {
-                Button {
-                    shareSubtitles()
-                } label: {
-                    HStack {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("Export Subtitles")
+    private var azureSection: some View {
+        Section("Azure Speech (Optional)") {
+            Toggle("Use Azure STT", isOn: Binding(
+                get: { speechManager.useAzure },
+                set: { newValue in
+                    if newValue {
+                        // 켜려고 할 때: API 키가 없으면 경고 후 차단
+                        if speechManager.azureApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            showAzureAlert = true
+                            // 토글 켜지지 않게 유지
+                        } else {
+                            speechManager.useAzure = true
+                        }
+                    } else {
+                        speechManager.useAzure = false
                     }
                 }
-                .disabled(speechManager.allSubtitles.isEmpty)
+            ))
 
-                Text("총 \(speechManager.allSubtitles.count)줄 저장됨")
-                    .font(.footnote)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("API Key")
+                    .font(.subheadline)
                     .foregroundColor(.secondary)
-            } else {
-                HStack {
-                    Image(systemName: "lock.fill")
-                        .foregroundColor(.secondary)
-                    Text("Only for subscribers")
-                        .foregroundColor(.secondary)
-                }
+                SecureField("Enter Azure API Key", text: $speechManager.azureApiKey)
+                    .textFieldStyle(.roundedBorder)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .onChange(of: speechManager.azureApiKey) { _, newValue in
+                        // API 키가 지워지면 자동으로 Azure 비활성화
+                        if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            speechManager.useAzure = false
+                        }
+                    }
+            }
 
-                Button {
-                    showPaywall = true
-                } label: {
-                    Text("Upgrade to Pro")
-                        .foregroundColor(.accentColor)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Region")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                TextField("e.g. koreacentral", text: $speechManager.azureRegion)
+                    .textFieldStyle(.roundedBorder)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+            }
+
+            if speechManager.useAzure && !speechManager.azureApiKey.isEmpty {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Azure STT 활성화됨")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
             }
+        }
+        .alert("Azure API 안내", isPresented: $showAzureAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("Azure API를 별도로 구독하셔야 이 기능을 사용할 수 있습니다. API Key를 먼저 입력해 주세요.")
+        }
+    }
+
+    private var exportSection: some View {
+        Section("Export Subtitles") {
+            Button {
+                shareSubtitles()
+            } label: {
+                HStack {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("Export Subtitles")
+                }
+            }
+            .disabled(speechManager.allSubtitles.isEmpty)
+
+            Text("총 \(speechManager.allSubtitles.count)줄 저장됨")
+                .font(.footnote)
+                .foregroundColor(.secondary)
         }
     }
 

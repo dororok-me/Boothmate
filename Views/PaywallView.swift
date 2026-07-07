@@ -18,6 +18,26 @@ struct PaywallView: View {
             )
             .ignoresSafeArea()
 
+            // 닫기 버튼 (우측 상단)
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 32, height: 32)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Circle())
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.top, 12)
+                }
+                Spacer()
+            }
+
             VStack(spacing: 0) {
                 Spacer()
 
@@ -47,11 +67,18 @@ struct PaywallView: View {
                 .padding(.horizontal, 32)
                 .padding(.bottom, 40)
 
-                // 가격
+                // 가격 (StoreKit에서 현지화된 가격 자동 표시)
                 VStack(spacing: 8) {
-                    Text("월 $9.99")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(.white)
+                    if let product = subscriptionManager.products.first {
+                        Text("\(product.displayPrice) / 월")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.white)
+                    } else {
+                        // 상품 로드 전 폴백
+                        Text("월 요금제")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.white)
+                    }
 
                     Text("언제든지 취소 가능")
                         .font(.system(size: 14))
@@ -85,7 +112,7 @@ struct PaywallView: View {
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 16)
-                .disabled(isPurchasing || isRestoring)
+                .disabled(isPurchasing || isRestoring || subscriptionManager.products.isEmpty)
 
                 // 복원 버튼
                 Button {
